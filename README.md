@@ -1,59 +1,44 @@
-# TacticalBoardNext
+# Tactical Board Next
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 22.2.7.
+A modern, responsive, browser-based tactical football board for match analysis.
 
-## Development server
+![Tactical Board screenshot](docs/screenshot.png)
 
-To start a local development server, run:
+## Features
+
+- Proportioned 105×68 m pitch with all line markings
+- Full 11v11 setup (4-3-3 Home vs 4-2-3-1 Away) plus the ball
+- Smooth drag & drop (mouse and touch), constrained to the pitch
+- Responsive canvas that keeps coordinates intact on any screen size
+- Drawing mode for tactical passing/movement arrows
+- Undo / Redo / Clear Arrows
+- Store-driven rendering: the Konva scene is synced from the state
+
+## Tech Stack
+
+- Angular (standalone components, signals, OnPush)
+- NgRx Signals for state management
+- Konva.js, used natively outside the Angular zone for 60fps
+- Tailwind CSS v3
+
+## Getting Started
 
 ```bash
+npm install
 ng serve
 ```
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+Then open http://localhost:4200.
 
-## Code scaffolding
+## Roadmap
 
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+- [x] Phase 1: pitch, players, drag & drop, drawing mode
+- [x] Undo / redo / clear drawings
+- [ ] Pitch divisions overlay (half-spaces, final third, 16-yard grids)
+- [ ] Timeline engine for frame-by-frame animation
+- [ ] Client-side MP4 export with FFmpeg.wasm
+- [ ] AI-driven tactical setups via natural language
 
-```bash
-ng generate component component-name
-```
+## Author
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
-
-```bash
-ng generate --help
-```
-
-## Building
-
-To build the project run:
-
-```bash
-ng build
-```
-
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
-
-## Running unit tests
-
-To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
-
-```bash
-ng test
-```
-
-## Running end-to-end tests
-
-For end-to-end (e2e) testing, run:
-
-```bash
-ng e2e
-```
-
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+Ahmed Mohamed
