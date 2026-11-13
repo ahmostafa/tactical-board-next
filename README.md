@@ -9,8 +9,14 @@ A modern, responsive, browser-based tactical football board for match analysis. 
 ### Full 11v11 setup
 A 105×68 m pitch with all line markings and a complete 4-3-3 (red) vs 4-2-3-1 (blue) setup, plus a classic black-and-white ball. Every token can be dragged with the mouse or a finger, and is kept inside the pitch lines.
 
-### Tactical arrows
-Switch on **Draw Tactical Arrows** to freeze the players and sketch passing or movement lines. Stray taps are ignored, and arrows live in the store, so they take part in undo/redo, save and load.
+### Tactical arrows (Pass, Run, Dribble) & curved paths
+Switch on **Draw Tactical Arrows** to freeze the players and sketch lines in three distinct tactical styles:
+
+- **Pass:** solid yellow arrow for ball passes
+- **Run:** dashed arrow for off-the-ball player runs
+- **Dribble:** wavy arrow for ball-carrier dribbles
+
+Every drawn arrow has a draggable midpoint handle so you can bend any pass, run or dribble into a smooth curve. Stray taps are ignored, and arrows live in the store, so they take part in undo/redo, save and load.
 
 ![Tactical arrows](docs/board-arrows.png)
 
@@ -33,7 +39,8 @@ Build a play step by step with keyframes. Set up the first frame, press **+ Fram
 - **Scrub slider:** drag to preview the movement between two frames, and release to snap to the nearest one.
 - **Ghosting:** faded tokens and dashed trails show where every piece stood in the previous frame, so you can see each movement while editing.
 - **Per-frame arrows:** a pass or run is drawn in the step where it happens.
-- The board is locked during playback, so nothing moves by accident.
+- **Client-side MP4 export:** click **Export MP4** to render the interpolated 30 fps keyframe transitions in the browser with FFmpeg.wasm and download a ready-to-share `tactical-board.mp4` video.
+- The board is locked during playback and export, so nothing moves by accident.
 
 ![Timeline with ghost trails](docs/board-timeline.png)
 
@@ -53,6 +60,7 @@ A `ResizeObserver` keeps the Konva stage scaled to its container without losing 
 - **Angular**: standalone components, signals, OnPush change detection
 - **NgRx Signals**: single store for the timeline frames, player positions, arrows and undo/redo history
 - **Konva.js**: used natively outside the Angular zone for smooth rendering
+- **FFmpeg.wasm**: client-side 30 fps H.264 MP4 video encoding directly in the browser
 - **Tailwind CSS v3**
 
 ## Architecture Notes
@@ -77,9 +85,9 @@ Then open http://localhost:4200.
 - [x] Undo / redo / clear, keyboard shortcuts, reset, save & load
 - [x] Pitch divisions overlay
 - [x] Timeline engine: keyframes, animated playback, scrubber, ghosting
+- [x] Client-side MP4 export with FFmpeg.wasm
+- [x] Arrow styles (pass, run, dribble) and curved arrows
 - [ ] AI-driven tactical setups via natural language
-- [ ] Client-side MP4 export with FFmpeg.wasm
-- [ ] Arrow styles (pass, run, dribble) and curved arrows
 
 ## Author
 
