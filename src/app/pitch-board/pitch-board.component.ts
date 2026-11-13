@@ -578,7 +578,8 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
       this.ghostLayer.batchDraw();
 
       const capturePng = (idx: number) => {
-        const scale = this.stage.scaleX();
+        this.stage.draw();
+        const scale = this.stage.scaleX() || 1;
         const dataUrl = this.stage.toDataURL({
           pixelRatio: 1 / scale,
           mimeType: 'image/png',
@@ -671,6 +672,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
       const ret = runExec([
         '-framerate', String(fps),
         '-i', 'f_%04d.png',
+        '-vf', 'scale=1050:680:flags=lanczos',
         '-c:v', 'libx264',
         '-pix_fmt', 'yuv420p',
         '-preset', 'ultrafast',
@@ -681,6 +683,9 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
         runExec([
           '-framerate', String(fps),
           '-i', 'f_%04d.png',
+          '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2',
+          '-c:v', 'mpeg4',
+          '-q:v', '3',
           '-pix_fmt', 'yuv420p',
           'tactical-board.mp4',
         ]);
@@ -688,7 +693,12 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
 
       const data: Uint8Array = core.FS.readFile('tactical-board.mp4', { encoding: 'binary' });
       writtenFiles.push('tactical-board.mp4');
-      const blob = new Blob([new Uint8Array(data)], { type: 'video/mp4' });
+      if (!data || data.byteLength < 256) {
+        throw new Error(`Encoded MP4 is empty (${data?.byteLength ?? 0} bytes)`);
+      }
+      const copy = new Uint8Array(data.byteLength);
+      copy.set(data);
+      const blob = new Blob([copy.buffer], { type: 'video/mp4' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
