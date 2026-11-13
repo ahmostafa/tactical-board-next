@@ -200,12 +200,56 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     this.pitchLayer.add(boundary, halfwayLine, centerCircle, leftBox, rightBox, leftGoalArea, rightGoalArea);
   }
 
+  /** Classic black & white football: white sphere, black centre pentagon, surrounding patches. */
+  private addClassicBall(group: Konva.Group, r: number) {
+    group.add(new Konva.Circle({ radius: r, fill: '#ffffff', stroke: '#111111', strokeWidth: 1.5 }));
+
+    // Pattern is clipped to the sphere so outer pentagons are cut by the edge (3D look)
+    const pattern = new Konva.Group({
+      clipFunc: (ctx) => { ctx.arc(0, 0, r, 0, Math.PI * 2, false); }
+    });
+    const black = '#111111';
+    const rad = (deg: number) => deg * Math.PI / 180;
+    const pt = (deg: number, dist: number) => ({ x: Math.cos(rad(deg)) * dist, y: Math.sin(rad(deg)) * dist });
+
+    for (let i = 0; i < 5; i++) {
+      const a = i * 72 - 90;          // direction of a centre-pentagon vertex
+      const next = a + 72;
+      const inner = pt(a, r * 0.38);
+      const outer = pt(a, r * 0.78);
+      const outerNext = pt(next, r * 0.78);
+      const mid = pt(a + 36, r * 0.62);
+
+      // Seam from each centre-pentagon corner out to the outer pentagon
+      pattern.add(new Konva.Line({ points: [inner.x, inner.y, outer.x, outer.y], stroke: black, strokeWidth: 1 }));
+      // Hexagon outline between neighbouring outer pentagons
+      pattern.add(new Konva.Line({
+        points: [outer.x, outer.y, mid.x, mid.y, outerNext.x, outerNext.y],
+        stroke: black, strokeWidth: 1, lineJoin: 'round',
+      }));
+      // Outer pentagon, pushed to the rim and cut by the clip
+      const rim = pt(a, r * 1.02);
+      pattern.add(new Konva.RegularPolygon({
+        x: rim.x, y: rim.y, sides: 5, radius: r * 0.42,
+        rotation: a + 90 + 180, // point toward the centre
+        fill: black,
+      }));
+    }
+
+    // Centre pentagon
+    pattern.add(new Konva.RegularPolygon({ sides: 5, radius: r * 0.38, fill: black }));
+    group.add(pattern);
+
+    // Outline drawn on top so the clipped edge stays crisp
+    group.add(new Konva.Circle({ radius: r, stroke: black, strokeWidth: 1.5 }));
+  }
+
   private drawPlayers() {
     const entities = this.store.entities();
 
     entities.forEach(entity => {
       const isBall = entity.type === 'ball';
-      const radius = isBall ? 8 : 15;
+      const radius = isBall ? 13 : 15;
 
       const group = new Konva.Group({
         id: entity.id,
@@ -222,13 +266,16 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
         }
       });
 
-      const circle = new Konva.Circle({
-        radius: radius,
-        fill: entity.type === 'home' ? '#e74c3c' : entity.type === 'away' ? '#3498db' : '#ffffff',
-        stroke: isBall ? '#000000' : entity.type === 'home' ? '#c0392b' : '#2980b9',
-        strokeWidth: isBall ? 1 : 2,
-      });
-      group.add(circle);
+      if (isBall) {
+        this.addClassicBall(group, radius);
+      } else {
+        group.add(new Konva.Circle({
+          radius: radius,
+          fill: entity.type === 'home' ? '#e74c3c' : '#3498db',
+          stroke: entity.type === 'home' ? '#c0392b' : '#2980b9',
+          strokeWidth: 2,
+        }));
+      }
 
       if (!isBall && entity.label) {
         const text = new Konva.Text({
