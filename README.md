@@ -25,11 +25,23 @@ The centre channel matches the width of the 6-yard box, and the half-spaces fill
 
 ![Pitch divisions overlay](docs/board-divisions.png)
 
+### Timeline and animation
+Build a play step by step with keyframes. Set up the first frame, press **+ Frame**, and move the pieces for the next phase.
+
+- **Animated playback:** pieces glide between frames with ease-in-out, and each frame's arrows fade in. The step duration is adjustable (0.3 to 3 s).
+- **Frame tools:** add a frame (same positions, no arrows), duplicate one (with its arrows), delete one, or jump to any frame with the numbered chips or the `←` / `→` keys.
+- **Scrub slider:** drag to preview the movement between two frames, and release to snap to the nearest one.
+- **Ghosting:** faded tokens and dashed trails show where every piece stood in the previous frame, so you can see each movement while editing.
+- **Per-frame arrows:** a pass or run is drawn in the step where it happens.
+- The board is locked during playback, so nothing moves by accident.
+
+![Timeline with ghost trails](docs/board-timeline.png)
+
 ### Undo, redo, reset and save/load
-- **Undo / Redo** for every player move, arrow and clear (also `Ctrl+Z`, `Ctrl+Y` and `Ctrl+Shift+Z`, with `Cmd` on Mac)
-- **Clear Arrows** to wipe the drawings
-- **Reset** to return to the starting formation (undoable)
-- **Save / Load** to keep a board in your browser's local storage; loading validates the data and is undoable too
+- **Undo / Redo** for every player move, arrow and clear within a frame (also `Ctrl+Z`, `Ctrl+Y` and `Ctrl+Shift+Z`, with `Cmd` on Mac)
+- **Clear Arrows** to wipe the drawings of the current frame
+- **Reset** to return the current frame to the starting formation (undoable)
+- **Save / Load** to keep the whole timeline in your browser's local storage; loading validates the data, and boards saved before the timeline existed still load
 
 ![Controls and saved board](docs/board-controls.png)
 
@@ -39,14 +51,15 @@ A `ResizeObserver` keeps the Konva stage scaled to its container without losing 
 ## Tech Stack
 
 - **Angular**: standalone components, signals, OnPush change detection
-- **NgRx Signals**: single store for player positions, arrows and undo/redo history
+- **NgRx Signals**: single store for the timeline frames, player positions, arrows and undo/redo history
 - **Konva.js**: used natively outside the Angular zone for smooth rendering
 - **Tailwind CSS v3**
 
 ## Architecture Notes
 
-- The store is the single source of truth. An `effect()` syncs the Konva nodes from it, which is what makes undo/redo, load and reset work, and it is the base for the upcoming timeline and AI features.
-- Konva has separate layers for the pitch, the divisions overlay, the drawings and the players.
+- The store is the single source of truth. An `effect()` syncs the Konva nodes from it, which is what makes undo/redo, load, reset and frame switching work, and it is the base for the upcoming AI feature and video export.
+- During playback Konva tweens drive the nodes directly, and the store is only updated when playback stops.
+- Konva has separate layers for the pitch, the divisions overlay, the ghost frame, the drawings and the players.
 
 ## Getting Started
 
@@ -63,9 +76,10 @@ Then open http://localhost:4200.
 - [x] Drawing mode for tactical arrows
 - [x] Undo / redo / clear, keyboard shortcuts, reset, save & load
 - [x] Pitch divisions overlay
-- [ ] Timeline engine for frame-by-frame animation
+- [x] Timeline engine: keyframes, animated playback, scrubber, ghosting
 - [ ] AI-driven tactical setups via natural language
 - [ ] Client-side MP4 export with FFmpeg.wasm
+- [ ] Arrow styles (pass, run, dribble) and curved arrows
 
 ## Author
 
