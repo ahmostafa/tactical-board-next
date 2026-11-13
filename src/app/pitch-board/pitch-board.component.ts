@@ -19,21 +19,26 @@ const STORAGE_KEY = 'tactical-board:v1';
           {{ isDrawingMode() ? 'Stop Drawing (Back to Dragging)' : 'Draw Tactical Arrows' }}
         </button>
         <div class="inline-flex rounded shadow-md overflow-hidden" role="group" aria-label="Arrow style">
-          <button (click)="arrowStyle.set('pass')"
+          <button (click)="selectArrowStyle('pass')"
                   class="px-3 py-2 text-xs font-bold text-white transition-colors"
                   [class.bg-amber-600]="arrowStyle() === 'pass'"
                   [class.bg-gray-700]="arrowStyle() !== 'pass'"
                   title="Solid arrow for passes">Pass</button>
-          <button (click)="arrowStyle.set('run')"
-                  class="px-3 py-2 text-xs font-bold text-white border-x border-gray-600 transition-colors"
+          <button (click)="selectArrowStyle('run')"
+                  class="px-3 py-2 text-xs font-bold text-white border-l border-gray-600 transition-colors"
                   [class.bg-amber-600]="arrowStyle() === 'run'"
                   [class.bg-gray-700]="arrowStyle() !== 'run'"
                   title="Dashed arrow for off-the-ball runs">Run</button>
-          <button (click)="arrowStyle.set('dribble')"
-                  class="px-3 py-2 text-xs font-bold text-white transition-colors"
+          <button (click)="selectArrowStyle('dribble')"
+                  class="px-3 py-2 text-xs font-bold text-white border-l border-gray-600 transition-colors"
                   [class.bg-amber-600]="arrowStyle() === 'dribble'"
                   [class.bg-gray-700]="arrowStyle() !== 'dribble'"
                   title="Wavy arrow for ball carrier dribbles">Dribble</button>
+          <button (click)="selectArrowStyle('zone')"
+                  class="px-3 py-2 text-xs font-bold text-white border-l border-gray-600 transition-colors"
+                  [class.bg-amber-600]="arrowStyle() === 'zone'"
+                  [class.bg-gray-700]="arrowStyle() !== 'zone'"
+                  title="Arrow pointing into a highlighted empty space / target zone">Target Zone</button>
         </div>
         <button (click)="toggleDivisions()"
                 class="px-4 py-2 text-white font-bold rounded shadow-md transition-colors"
@@ -164,13 +169,14 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
   private renderArrows(arrows: TacticalArrow[], showHandles = false) {
     this.drawingLayer.destroyChildren();
     arrows.forEach(a => {
-      const arrowNode = this.createArrow(a);
-      this.drawingLayer.add(arrowNode);
+      const arrowGroup = this.createArrow(a);
+      this.drawingLayer.add(arrowGroup);
 
       if (showHandles) {
         const [x1, y1, x2, y2] = a.points;
         const [cx, cy] = a.controlPoint ?? [(x1 + x2) / 2, (y1 + y2) / 2];
         const handle = new Konva.Circle({
+          name: 'curve-handle',
           x: cx,
           y: cy,
           radius: 6,
@@ -188,10 +194,12 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
           },
         });
         handle.on('mouseenter', () => { this.stage.container().style.cursor = 'grab'; });
-        handle.on('mouseleave', () => { this.stage.container().style.cursor = 'default'; });
+        handle.on('mouseleave', () => {
+          this.stage.container().style.cursor = this.isDrawingMode() ? 'crosshair' : 'default';
+        });
         handle.on('dragmove', () => {
           const p = handle.position();
-          arrowNode.points(this.computeArrowPath(a.points, a.style ?? 'pass', [p.x, p.y]));
+          this.updateArrowGroup(arrowGroup, a.points, a.style ?? 'pass', [p.x, p.y]);
         });
         handle.on('dragend', () => {
           const p = handle.position();
@@ -238,22 +246,69 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     });
   }
 
-  private createArrow(arrow: Pick<TacticalArrow, 'points' | 'style' | 'controlPoint'>): Konva.Arrow {
+  private readonly ZONE_RADIUS = 28;
+
+  private createArrow(arrow: Pick<TacticalArrow, 'points' | 'style' | 'controlPoint'>): Konva.Group {
     const style = arrow.style ?? 'pass';
+    const group = new Konva.Group({ listening: false });
+
+    if (style === 'zone') {
+      const [, , x2, y2] = arrow.points;
+      group.add(new Konva.Circle({
+        name: 'zone-outer',
+        x: x2,
+        y: y2,
+        radius: this.ZONE_RADIUS,
+        fill: 'rgba(241, 196, 15, 0.20)',
+        stroke: '#f1c40f',
+        strokeWidth: 2.5,
+        dash: [8, 5],
+        listening: false,
+      }));
+      group.add(new Konva.Circle({
+        name: 'zone-inner',
+        x: x2,
+        y: y2,
+        radius: 5,
+        fill: 'rgba(241, 196, 15, 0.55)',
+        listening: false,
+      }));
+    }
+
     const pathPoints = this.computeArrowPath(arrow.points, style, arrow.controlPoint);
-    return new Konva.Arrow({
+    group.add(new Konva.Arrow({
+      name: 'arrow-line',
       points: pathPoints,
       pointerLength: 15,
       pointerWidth: 15,
       fill: '#f1c40f',
       stroke: '#f1c40f',
       strokeWidth: 4,
-      dash: style === 'run' ? [12, 8] : undefined,
+      dash: style === 'run' || style === 'zone' ? [12, 8] : undefined,
       tension: style === 'dribble' ? 0.35 : 0,
       lineCap: 'round',
       lineJoin: 'round',
       listening: false,
-    });
+    }));
+
+    return group;
+  }
+
+  private updateArrowGroup(
+    group: Konva.Group,
+    points: [number, number, number, number],
+    style: ArrowStyle,
+    controlPoint?: [number, number]
+  ) {
+    const line = group.findOne<Konva.Arrow>('.arrow-line');
+    if (line) {
+      line.points(this.computeArrowPath(points, style, controlPoint));
+    }
+    if (style === 'zone') {
+      const [, , x2, y2] = points;
+      group.findOne('.zone-outer')?.position({ x: x2, y: y2 });
+      group.findOne('.zone-inner')?.position({ x: x2, y: y2 });
+    }
   }
 
   /** Computes sampled points along a straight/curved line, adding sine waves for dribbles. */
@@ -262,31 +317,38 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     style: ArrowStyle,
     controlPoint?: [number, number]
   ): number[] {
-    const [x1, y1, x2, y2] = points;
-    const dist = Math.hypot(x2 - x1, y2 - y1);
-    if (dist < 2) return [x1, y1, x2, y2];
+    const [x1, y1, rawX2, rawY2] = points;
+    const rawDist = Math.hypot(rawX2 - x1, rawY2 - y1);
+    if (rawDist < 2) return [x1, y1, rawX2, rawY2];
 
-    const mx = (x1 + x2) / 2;
-    const my = (y1 + y2) / 2;
+    const mx = (x1 + rawX2) / 2;
+    const my = (y1 + rawY2) / 2;
     const [cx, cy] = controlPoint ?? [mx, my];
     const isCurved = Math.hypot(cx - mx, cy - my) > 1.5;
 
     // Quadratic Bezier control point so the curve passes directly through the handle (cx, cy) at t = 0.5
-    const qx = 2 * cx - 0.5 * (x1 + x2);
-    const qy = 2 * cy - 0.5 * (y1 + y2);
+    const qx = 2 * cx - 0.5 * (x1 + rawX2);
+    const qy = 2 * cy - 0.5 * (y1 + rawY2);
+
+    // For 'zone', stop the arrow tip right at the rim of the target zone circle so it points cleanly into the space
+    const endT = style === 'zone' && rawDist > this.ZONE_RADIUS + 12
+      ? Math.max(0.25, 1 - (this.ZONE_RADIUS - 2) / rawDist)
+      : 1;
 
     const pointAt = (t: number): [number, number] => {
-      if (!isCurved) return [x1 + (x2 - x1) * t, y1 + (y2 - y1) * t];
-      const u = 1 - t;
+      const s = t * endT;
+      if (!isCurved) return [x1 + (rawX2 - x1) * s, y1 + (rawY2 - y1) * s];
+      const u = 1 - s;
       return [
-        u * u * x1 + 2 * u * t * qx + t * t * x2,
-        u * u * y1 + 2 * u * t * qy + t * t * y2,
+        u * u * x1 + 2 * u * s * qx + s * s * rawX2,
+        u * u * y1 + 2 * u * s * qy + s * s * rawY2,
       ];
     };
 
     const tangentAt = (t: number): [number, number] => {
-      const dx = isCurved ? 2 * (1 - t) * (qx - x1) + 2 * t * (x2 - qx) : x2 - x1;
-      const dy = isCurved ? 2 * (1 - t) * (qy - y1) + 2 * t * (y2 - qy) : y2 - y1;
+      const s = t * endT;
+      const dx = isCurved ? 2 * (1 - s) * (qx - x1) + 2 * s * (rawX2 - qx) : rawX2 - x1;
+      const dy = isCurved ? 2 * (1 - s) * (qy - y1) + 2 * s * (rawY2 - qy) : rawY2 - y1;
       const len = Math.hypot(dx, dy) || 1;
       return [dx / len, dy / len];
     };
@@ -294,7 +356,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     if (style === 'dribble') {
       const waveLen = 20;
       const amp = 5.5;
-      const cycles = Math.max(2, Math.round(dist / waveLen));
+      const cycles = Math.max(2, Math.round(rawDist / waveLen));
       const steps = cycles * 6;
       const out: number[] = [];
       for (let i = 0; i <= steps; i++) {
@@ -309,7 +371,10 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
       return out;
     }
 
-    if (!isCurved) return [x1, y1, x2, y2];
+    if (!isCurved) {
+      const [ex, ey] = pointAt(1);
+      return [x1, y1, ex, ey];
+    }
 
     const steps = 20;
     const out: number[] = [];
@@ -464,7 +529,21 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
 
   private updateDraggable() {
     const draggable = !this.isDrawingMode() && !this.isPlaying() && !this.isExporting();
-    this.entityLayer.getChildren().forEach(group => group.draggable(draggable));
+    if (this.entityLayer) {
+      this.entityLayer.listening(draggable);
+      this.entityLayer.getChildren().forEach(group => group.draggable(draggable));
+    }
+    if (this.stage) {
+      this.stage.container().style.cursor = this.isDrawingMode() ? 'crosshair' : 'default';
+    }
+  }
+
+  selectArrowStyle(style: ArrowStyle) {
+    this.arrowStyle.set(style);
+    if (!this.isDrawingMode()) {
+      this.isDrawingMode.set(true);
+      this.updateDraggable();
+    }
   }
 
   // ---- Client-side MP4 video export via FFmpeg.wasm ----
@@ -686,7 +765,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
   private resizeObserver!: ResizeObserver;
 
   // Drawing State
-  private currentArrow: Konva.Arrow | null = null;
+  private currentArrow: Konva.Group | null = null;
   private currentArrowStart: [number, number] = [0, 0];
   private currentArrowEnd: [number, number] = [0, 0];
 
@@ -816,8 +895,8 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     this.stage.on('mousedown touchstart', (e) => {
       if (!this.isDrawingMode() || this.isPlaying() || this.isExporting()) return;
 
-      // Ignore mousedown if the user clicked on a curve control handle
-      if (e.target !== this.stage) return;
+      // Ignore mousedown only if the user clicked on a curve control handle
+      if (e.target.name() === 'curve-handle') return;
 
       const pos = this.stage.getPointerPosition();
       if (!pos) return;
@@ -850,8 +929,10 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
 
       this.currentArrowEnd = [internalX, internalY];
       const [x1, y1] = this.currentArrowStart;
-      this.currentArrow.points(
-        this.computeArrowPath([x1, y1, internalX, internalY], this.arrowStyle())
+      this.updateArrowGroup(
+        this.currentArrow,
+        [x1, y1, internalX, internalY],
+        this.arrowStyle()
       );
     });
 

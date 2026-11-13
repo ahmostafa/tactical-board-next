@@ -9,7 +9,7 @@ export interface TacticalEntity {
   label?: string; // Added to hold the player number
 }
 
-export type ArrowStyle = 'pass' | 'run' | 'dribble';
+export type ArrowStyle = 'pass' | 'run' | 'dribble' | 'zone';
 
 export interface TacticalArrow {
   id: string;
@@ -105,7 +105,8 @@ const showFrame = (frames: Snapshot[], index: number): Partial<State> => ({
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 const clampStep = (ms: number) => Math.min(MAX_STEP_MS, Math.max(MIN_STEP_MS, Math.round(ms)));
 
-const isArrowStyle = (v: unknown): v is ArrowStyle => v === 'pass' || v === 'run' || v === 'dribble';
+const isArrowStyle = (v: unknown): v is ArrowStyle =>
+  v === 'pass' || v === 'run' || v === 'dribble' || v === 'zone';
 
 /** Rebuilds a frame from untrusted data, keeping only known players and valid arrows. */
 const sanitizeFrame = (raw: any): Snapshot => {

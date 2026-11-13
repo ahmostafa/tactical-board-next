@@ -9,14 +9,15 @@ A modern, responsive, browser-based tactical football board for match analysis. 
 ### Full 11v11 setup
 A 105×68 m pitch with all line markings and a complete 4-3-3 (red) vs 4-2-3-1 (blue) setup, plus a classic black-and-white ball. Every token can be dragged with the mouse or a finger, and is kept inside the pitch lines.
 
-### Tactical arrows (Pass, Run, Dribble) & curved paths
-Switch on **Draw Tactical Arrows** to freeze the players and sketch lines in three distinct tactical styles:
+### Tactical arrows (Pass, Run, Dribble, Target Zone) & curved paths
+Switch on **Draw Tactical Arrows** (or click any arrow style button directly) to freeze the players and sketch lines in four distinct tactical styles:
 
 - **Pass:** solid yellow arrow for ball passes
 - **Run:** dashed arrow for off-the-ball player runs
 - **Dribble:** wavy arrow for ball-carrier dribbles
+- **Target Zone:** dashed movement arrow pointing into a highlighted empty-space circle to show a player exploiting open space
 
-Every drawn arrow has a draggable midpoint handle so you can bend any pass, run or dribble into a smooth curve. Stray taps are ignored, and arrows live in the store, so they take part in undo/redo, save and load.
+You can start drawing directly on top of any player token on the first click. Every drawn arrow has a draggable midpoint handle so you can bend any pass, run, dribble or target-zone movement into a smooth curve. Stray taps are ignored, and arrows live in the store, so they take part in undo/redo, save and load.
 
 ![Tactical arrows](docs/board-arrows.png)
 
