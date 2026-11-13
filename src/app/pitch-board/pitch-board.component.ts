@@ -669,24 +669,52 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
         return ret;
       };
 
+      try { core.FS.unlink('tactical-board.mp4'); } catch {}
+
+      const durationSec = (frameIdx / fps).toFixed(3);
+      const vf =
+        'scale=1280:720:force_original_aspect_ratio=decrease:flags=lanczos,' +
+        'pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=#111827,' +
+        'setsar=1,format=yuv420p';
+
       const ret = runExec([
         '-framerate', String(fps),
         '-i', 'f_%04d.png',
-        '-vf', 'scale=1050:680:flags=lanczos',
+        '-f', 'lavfi',
+        '-t', durationSec,
+        '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100',
+        '-vf', vf,
         '-c:v', 'libx264',
+        '-preset', 'veryfast',
+        '-profile:v', 'main',
+        '-level', '3.1',
+        '-bf', '0',
+        '-crf', '20',
         '-pix_fmt', 'yuv420p',
-        '-preset', 'ultrafast',
+        '-colorspace', 'bt709',
+        '-color_primaries', 'bt709',
+        '-color_trc', 'bt709',
+        '-color_range', 'tv',
+        '-c:a', 'aac',
+        '-b:a', '96k',
+        '-shortest',
+        '-brand', 'mp42',
         '-movflags', '+faststart',
         'tactical-board.mp4',
       ]);
       if (ret !== 0) {
+        try { core.FS.unlink('tactical-board.mp4'); } catch {}
         runExec([
           '-framerate', String(fps),
           '-i', 'f_%04d.png',
-          '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2',
-          '-c:v', 'mpeg4',
-          '-q:v', '3',
+          '-vf', vf,
+          '-c:v', 'libx264',
+          '-preset', 'ultrafast',
+          '-profile:v', 'baseline',
+          '-level', '3.0',
           '-pix_fmt', 'yuv420p',
+          '-brand', 'mp42',
+          '-movflags', '+faststart',
           'tactical-board.mp4',
         ]);
       }
