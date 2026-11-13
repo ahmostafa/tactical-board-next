@@ -1,6 +1,6 @@
-import { Component, ElementRef, ViewChild, AfterViewInit, OnDestroy, NgZone, ChangeDetectionStrategy, inject, signal, effect, HostListener } from '@angular/core';
+import { Component, ElementRef, ViewChild, AfterViewInit, OnDestroy, NgZone, ChangeDetectionStrategy, inject, signal, effect, computed, HostListener } from '@angular/core';
 import Konva from 'konva';
-import { BoardStore } from './board.store';
+import { BoardStore, TacticalEntity } from './board.store';
 
 const STORAGE_KEY = 'tactical-board:v1';
 
@@ -11,7 +11,7 @@ const STORAGE_KEY = 'tactical-board:v1';
   template: `
     <div class="w-full max-w-5xl mx-auto p-4">
       <!-- Toolbar -->
-      <div class="flex flex-wrap gap-4 mb-4">
+      <fieldset class="flex flex-wrap gap-4 mb-4 border-0 p-0 m-0 min-w-0" [disabled]="isPlaying()">
         <button (click)="toggleDrawingMode()"
                 class="px-4 py-2 text-white font-bold rounded shadow-md transition-colors"
                 [class.bg-blue-600]="!isDrawingMode()"
@@ -39,10 +39,63 @@ const STORAGE_KEY = 'tactical-board:v1';
         @if (statusMessage()) {
           <span class="self-center text-sm text-gray-300">{{ statusMessage() }}</span>
         }
-      </div>
+      </fieldset>
 
       <!-- The Canvas Container -->
       <div class="aspect-[105/68] bg-[#2e7d32] shadow-2xl overflow-hidden rounded-md touch-none select-none" #canvasContainer></div>
+
+      <!-- Timeline -->
+      <div class="mt-4 p-3 rounded-md bg-gray-800 text-white flex flex-col gap-3">
+        <div class="flex flex-wrap items-center gap-3">
+          <button (click)="isPlaying() ? stopPlayback() : play()"
+                  [disabled]="!isPlaying() && store.frameCount() < 2"
+                  class="px-4 py-2 font-bold rounded shadow-md disabled:opacity-40"
+                  [class.bg-blue-600]="!isPlaying()"
+                  [class.bg-red-600]="isPlaying()">
+            {{ isPlaying() ? 'Stop' : 'Play' }}
+          </button>
+
+          <fieldset class="flex flex-wrap items-center gap-2 border-0 p-0 m-0 min-w-0" [disabled]="isPlaying()">
+            <button (click)="store.goToFrame(store.currentFrame() - 1)" [disabled]="store.currentFrame() === 0"
+                    class="px-3 py-2 bg-gray-700 rounded disabled:opacity-40" aria-label="Previous frame">&lt;</button>
+            @for (i of frameIndexes(); track i) {
+              <button (click)="store.goToFrame(i)"
+                      class="min-w-9 px-3 py-2 rounded font-bold text-sm"
+                      [class.bg-emerald-600]="i === store.currentFrame()"
+                      [class.bg-gray-700]="i !== store.currentFrame()">{{ i + 1 }}</button>
+            }
+            <button (click)="store.goToFrame(store.currentFrame() + 1)"
+                    [disabled]="store.currentFrame() >= store.frameCount() - 1"
+                    class="px-3 py-2 bg-gray-700 rounded disabled:opacity-40" aria-label="Next frame">&gt;</button>
+
+            <button (click)="store.addFrame()" class="px-3 py-2 bg-blue-700 rounded text-sm font-bold"
+                    title="New step with the same positions and no arrows">+ Frame</button>
+            <button (click)="store.duplicateFrame()" class="px-3 py-2 bg-gray-700 rounded text-sm font-bold"
+                    title="Copy this step including its arrows">Duplicate</button>
+            <button (click)="deleteFrame()" [disabled]="store.frameCount() < 2"
+                    class="px-3 py-2 bg-gray-700 rounded text-sm font-bold disabled:opacity-40">Delete</button>
+          </fieldset>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+          <label class="flex items-center gap-2 grow min-w-48">
+            Scrub
+            <input type="range" class="w-full" min="0" step="0.01"
+                   [max]="store.frameCount() - 1" [value]="scrubPos()"
+                   [disabled]="isPlaying() || store.frameCount() < 2"
+                   (input)="onScrub($event)" (change)="onScrubEnd()" />
+          </label>
+          <label class="flex items-center gap-2">
+            Step {{ (store.stepDurationMs() / 1000).toFixed(1) }}s
+            <input type="range" min="300" max="3000" step="100" [value]="store.stepDurationMs()"
+                   (input)="store.setStepDuration(+$any($event.target).value)" />
+          </label>
+          <label class="flex items-center gap-2">
+            <input type="checkbox" [checked]="showGhost()" (change)="showGhost.set(!showGhost())" />
+            Ghost previous frame
+          </label>
+        </div>
+      </div>
     </div>
   `
 })
@@ -53,21 +106,75 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
   protected store = inject(BoardStore);
 
   constructor() {
-    // Keep Konva nodes in sync with the store (undo/redo/clear, future timeline/AI).
+    // Keep Konva nodes in sync with the store (undo/redo, frame changes, load, reset).
+    // While the animation plays, Konva drives the nodes itself.
     effect(() => {
-      const entities = this.store.entities();
-      const arrows = this.store.arrows();
-      if (!this.entityLayer) return; // canvas not initialised yet
+      this.showGhost();
+      if (this.isPlaying()) return;
+      this.syncFromStore();
+    });
+  }
 
-      entities.forEach(e => {
-        const node = this.entityLayer.findOne('#' + e.id);
-        if (node && (node.x() !== e.x || node.y() !== e.y)) node.position({ x: e.x, y: e.y });
-      });
+  /** Makes the canvas match the store: positions, arrows of the current frame and the ghost frame. */
+  private syncFromStore() {
+    const entities = this.store.entities();
+    const arrows = this.store.arrows();
+    const frames = this.store.frames();
+    const current = this.store.currentFrame();
+    const ghost = this.showGhost();
+    if (!this.entityLayer) return; // canvas not initialised yet
 
-      this.drawingLayer.destroyChildren();
-      arrows.forEach(a => this.drawingLayer.add(this.createArrow(a.points)));
-      this.entityLayer.batchDraw();
-      this.drawingLayer.batchDraw();
+    entities.forEach(e => {
+      const node = this.entityLayer.findOne('#' + e.id);
+      if (node && (node.x() !== e.x || node.y() !== e.y)) node.position({ x: e.x, y: e.y });
+    });
+
+    this.renderArrows(arrows);
+    this.drawingLayer.opacity(1);
+    this.renderGhost(ghost && current > 0 ? frames[current - 1].entities : null, entities);
+    this.scrubPos.set(current);
+
+    this.entityLayer.batchDraw();
+    this.drawingLayer.batchDraw();
+    this.ghostLayer.batchDraw();
+  }
+
+  private renderArrows(arrows: { points: number[] }[]) {
+    this.drawingLayer.destroyChildren();
+    arrows.forEach(a => this.drawingLayer.add(this.createArrow(a.points)));
+  }
+
+  /** Faded tokens and dashed trails showing where each piece stood in the previous frame. */
+  private renderGhost(previous: TacticalEntity[] | null, current: TacticalEntity[]) {
+    this.ghostLayer.destroyChildren();
+    if (!previous) return;
+
+    previous.forEach(p => {
+      const now = current.find(e => e.id === p.id);
+      if (!now || Math.hypot(now.x - p.x, now.y - p.y) < 4) return;
+
+      const isBall = p.type === 'ball';
+      const color = p.type === 'home' ? '#e74c3c' : p.type === 'away' ? '#3498db' : '#ffffff';
+      this.ghostLayer.add(new Konva.Arrow({
+        points: [p.x, p.y, now.x, now.y],
+        stroke: 'rgba(255, 255, 255, 0.55)',
+        fill: 'rgba(255, 255, 255, 0.55)',
+        strokeWidth: 2,
+        dash: [8, 6],
+        pointerLength: 8,
+        pointerWidth: 8,
+        listening: false,
+      }));
+      this.ghostLayer.add(new Konva.Circle({
+        x: p.x, y: p.y,
+        radius: isBall ? 13 : 15,
+        fill: color,
+        opacity: 0.3,
+        stroke: '#ffffff',
+        strokeWidth: 1,
+        dash: [4, 3],
+        listening: false,
+      }));
     });
   }
 
@@ -87,12 +194,24 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
   // UI State
   isDrawingMode = signal(false);
   showDivisions = signal(false);
+  showGhost = signal(true);
+  isPlaying = signal(false);
+  scrubPos = signal(0);
+  protected frameIndexes = computed(() => Array.from({ length: this.store.frameCount() }, (_, i) => i));
   hasSavedBoard = signal(localStorage.getItem(STORAGE_KEY) !== null);
   statusMessage = signal('');
   private statusTimer?: ReturnType<typeof setTimeout>;
 
   @HostListener('window:keydown', ['$event'])
   onKeydown(event: KeyboardEvent) {
+    if (this.isPlaying()) return;
+
+    // Frame navigation (ignored while a slider/input has focus so it keeps its own arrow-key behaviour)
+    if (!(event.target instanceof HTMLInputElement)) {
+      if (event.key === 'ArrowLeft') { this.store.goToFrame(this.store.currentFrame() - 1); return; }
+      if (event.key === 'ArrowRight') { this.store.goToFrame(this.store.currentFrame() + 1); return; }
+    }
+
     if (!(event.ctrlKey || event.metaKey)) return;
     const key = event.key.toLowerCase();
     if (key === 'z' && !event.shiftKey) {
@@ -111,8 +230,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
 
   saveBoard() {
     try {
-      const data = { entities: this.store.entities(), arrows: this.store.arrows() };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.store.exportBoard()));
       this.hasSavedBoard.set(true);
       this.showStatus('Board saved');
     } catch {
@@ -125,23 +243,129 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return;
       const data = JSON.parse(raw);
-      const isNum = (v: unknown) => typeof v === 'number' && Number.isFinite(v);
 
-      // Only accept positions for entities that exist on the board
-      const saved = new Map<string, { x: number; y: number }>();
-      (Array.isArray(data.entities) ? data.entities : []).forEach((e: any) => {
-        if (typeof e?.id === 'string' && isNum(e.x) && isNum(e.y)) saved.set(e.id, { x: e.x, y: e.y });
-      });
-      const entities = this.store.entities().map(e => ({ ...e, ...(saved.get(e.id) ?? {}) }));
-
-      const arrows = (Array.isArray(data.arrows) ? data.arrows : [])
-        .filter((a: any) => typeof a?.id === 'string' && Array.isArray(a.points) && a.points.length === 4 && a.points.every(isNum));
-
-      this.store.replaceBoard(entities, arrows);
+      if (!this.store.importBoard(data)) {
+        this.showStatus('Saved board is corrupted');
+        return;
+      }
+      this.syncFromStore();
       this.showStatus('Board loaded');
     } catch {
       this.showStatus('Saved board is corrupted');
     }
+  }
+
+  deleteFrame() {
+    if (this.store.frameCount() < 2) return;
+    if (confirm(`Delete frame ${this.store.currentFrame() + 1}?`)) this.store.deleteFrame();
+  }
+
+  // ---- Timeline playback ----
+  private activeTweens: Konva.Tween[] = [];
+  private playbackTarget = 0;
+
+  play() {
+    if (this.isPlaying()) return;
+    const last = this.store.frameCount() - 1;
+    if (last < 1) return;
+
+    // Start from the current frame, or from the beginning if we're already at the end
+    if (this.store.currentFrame() >= last) this.store.goToFrame(0);
+    this.syncFromStore();
+    this.playbackTarget = this.store.currentFrame();
+
+    this.isPlaying.set(true);
+    this.updateDraggable();
+    this.ngZone.runOutsideAngular(() => this.playStep(this.playbackTarget));
+  }
+
+  stopPlayback() {
+    this.activeTweens.forEach(t => { t.pause(); t.destroy(); });
+    this.activeTweens = [];
+    this.drawingLayer.opacity(1);
+
+    // Stay on the frame we were heading to; the sync effect then snaps everything to it
+    this.ngZone.run(() => {
+      this.store.goToFrame(this.playbackTarget);
+      this.isPlaying.set(false);
+      this.updateDraggable();
+    });
+    this.syncFromStore();
+  }
+
+  /** Animates one transition (from -> from + 1): pieces glide, the next frame's arrows fade in. */
+  private playStep(from: number) {
+    const frames = this.store.frames();
+    const to = from + 1;
+    if (to >= frames.length) {
+      this.stopPlayback();
+      return;
+    }
+    this.playbackTarget = to;
+    this.ngZone.run(() => this.scrubPos.set(to));
+
+    const seconds = this.store.stepDurationMs() / 1000;
+    this.ghostLayer.destroyChildren();
+    this.ghostLayer.batchDraw();
+    this.renderArrows(frames[to].arrows);
+    this.drawingLayer.opacity(0);
+
+    const tweens: Konva.Tween[] = [];
+    frames[to].entities.forEach(e => {
+      const node = this.entityLayer.findOne('#' + e.id);
+      if (!node || (node.x() === e.x && node.y() === e.y)) return;
+      tweens.push(new Konva.Tween({ node, duration: seconds, x: e.x, y: e.y, easing: Konva.Easings.EaseInOut }));
+    });
+    // The arrow layer's fade also acts as the step clock
+    tweens.push(new Konva.Tween({
+      node: this.drawingLayer,
+      duration: seconds,
+      opacity: 1,
+      easing: Konva.Easings.EaseInOut,
+      onFinish: () => this.playStep(to),
+    }));
+
+    this.activeTweens = tweens;
+    tweens.forEach(t => t.play());
+  }
+
+  private updateDraggable() {
+    const draggable = !this.isDrawingMode() && !this.isPlaying();
+    this.entityLayer.getChildren().forEach(group => group.draggable(draggable));
+  }
+
+  // ---- Scrubber: preview positions between two frames without changing the store ----
+  onScrub(event: Event) {
+    const t = +(event.target as HTMLInputElement).value;
+    this.scrubPos.set(t);
+    this.previewAt(t);
+  }
+
+  onScrubEnd() {
+    this.store.goToFrame(Math.round(this.scrubPos()));
+    this.syncFromStore(); // also snaps the pieces back when the frame didn't change
+  }
+
+  private previewAt(t: number) {
+    const frames = this.store.frames();
+    if (frames.length < 2 || !this.entityLayer) return;
+
+    const i = Math.min(Math.floor(t), frames.length - 2);
+    const progress = Konva.Easings.EaseInOut(t - i, 0, 1, 1);
+    const next = new Map(frames[i + 1].entities.map(e => [e.id, e]));
+
+    frames[i].entities.forEach(a => {
+      const b = next.get(a.id);
+      const node = this.entityLayer.findOne('#' + a.id);
+      if (!b || !node) return;
+      node.position({ x: a.x + (b.x - a.x) * progress, y: a.y + (b.y - a.y) * progress });
+    });
+
+    this.renderArrows(frames[t - i < 0.5 ? i : i + 1].arrows);
+    this.ghostLayer.destroyChildren();
+    this.ghostLayer.batchDraw();
+    this.entityLayer.batchDraw();
+    this.drawingLayer.batchDraw();
   }
 
   private showStatus(message: string) {
@@ -154,6 +378,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
   private stage!: Konva.Stage;
   private pitchLayer!: Konva.Layer;
   private drawingLayer!: Konva.Layer;
+  private ghostLayer!: Konva.Layer;
   private divisionsLayer!: Konva.Layer;
   private entityLayer!: Konva.Layer;
   private resizeObserver!: ResizeObserver;
@@ -185,9 +410,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     this.isDrawingMode.set(!this.isDrawingMode());
 
     // Disable dragging on all players when drawing mode is active
-    this.entityLayer.getChildren().forEach(group => {
-      group.draggable(!this.isDrawingMode());
-    });
+    this.updateDraggable();
   }
 
   toggleDivisions() {
@@ -262,11 +485,13 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
 
     this.pitchLayer = new Konva.Layer();
     this.divisionsLayer = new Konva.Layer({ visible: false, listening: false }); // zones sit just above the pitch
+    this.ghostLayer = new Konva.Layer({ listening: false }); // previous-frame ghosts
     this.drawingLayer = new Konva.Layer(); // Sits below players, above pitch
     this.entityLayer = new Konva.Layer();
 
     this.stage.add(this.pitchLayer);
     this.stage.add(this.divisionsLayer);
+    this.stage.add(this.ghostLayer);
     this.stage.add(this.drawingLayer);
     this.stage.add(this.entityLayer);
   }
@@ -285,7 +510,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
   private setupDrawingEngine() {
     // 1. Start drawing the arrow on mouse/touch down
     this.stage.on('mousedown touchstart', (e) => {
-      if (!this.isDrawingMode()) return;
+      if (!this.isDrawingMode() || this.isPlaying()) return;
 
       const pos = this.stage.getPointerPosition();
       if (!pos) return;

@@ -21,8 +21,7 @@ interface Snapshot {
 
 const MAX_HISTORY = 100;
 
-const initialState = {
-  entities: [
+const INITIAL_ENTITIES = [
     // Home Team: 4-3-3 (Red, defending left side)
     { id: 'h1', type: 'home', x: 50, y: 340, label: '1' },
     { id: 'h2', type: 'home', x: 200, y: 580, label: '2' },
@@ -51,20 +50,70 @@ const initialState = {
 
     // The Ball
     { id: 'ball', type: 'ball', x: 525, y: 340 },
-  ] as TacticalEntity[],
+] as TacticalEntity[];
+
+const initialState = {
+  // Working copy of the frame being edited (kept in sync with frames[currentFrame])
+  entities: INITIAL_ENTITIES,
   arrows: [] as TacticalArrow[],
+  // Timeline: one snapshot per keyframe, arrows belong to the frame they were drawn on
+  frames: [{ entities: INITIAL_ENTITIES, arrows: [] as TacticalArrow[] }] as Snapshot[],
+  currentFrame: 0,
+  stepDurationMs: 1000,
   past: [] as Snapshot[],
   future: [] as Snapshot[],
 };
 
 type State = typeof initialState;
 
-// Pushes the current snapshot onto the undo stack and clears redo.
-const withHistory = (state: State, changes: Partial<Snapshot>): Partial<State> => ({
-  ...changes,
-  past: [...state.past, { entities: state.entities, arrows: state.arrows }].slice(-MAX_HISTORY),
+const MAX_FRAMES = 50;
+const MIN_STEP_MS = 200;
+const MAX_STEP_MS = 5000;
+
+const snapshotOf = (s: Snapshot): Snapshot => ({ entities: s.entities, arrows: s.arrows });
+const setFrame = (frames: Snapshot[], index: number, snap: Snapshot) =>
+  frames.map((f, i) => (i === index ? snap : f));
+
+// Applies a change to the current frame and pushes the previous snapshot onto the undo stack.
+const withHistory = (state: State, changes: Partial<Snapshot>): Partial<State> => {
+  const next: Snapshot = {
+    entities: changes.entities ?? state.entities,
+    arrows: changes.arrows ?? state.arrows,
+  };
+  return {
+    ...next,
+    frames: setFrame(state.frames, state.currentFrame, next),
+    past: [...state.past, snapshotOf(state)].slice(-MAX_HISTORY),
+    future: [],
+  };
+};
+
+// Switches the working copy to another frame. Undo history is per frame, so it is cleared.
+const showFrame = (frames: Snapshot[], index: number): Partial<State> => ({
+  frames,
+  currentFrame: index,
+  entities: frames[index].entities,
+  arrows: frames[index].arrows,
+  past: [],
   future: [],
 });
+
+const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+const clampStep = (ms: number) => Math.min(MAX_STEP_MS, Math.max(MIN_STEP_MS, Math.round(ms)));
+
+/** Rebuilds a frame from untrusted data, keeping only known players and valid arrows. */
+const sanitizeFrame = (raw: any): Snapshot => {
+  const saved = new Map<string, { x: number; y: number }>();
+  (Array.isArray(raw?.entities) ? raw.entities : []).forEach((e: any) => {
+    if (typeof e?.id === 'string' && isNum(e.x) && isNum(e.y)) saved.set(e.id, { x: e.x, y: e.y });
+  });
+  return {
+    entities: INITIAL_ENTITIES.map((e) => ({ ...e, ...(saved.get(e.id) ?? {}) })),
+    arrows: (Array.isArray(raw?.arrows) ? raw.arrows : []).filter(
+      (a: any) => typeof a?.id === 'string' && Array.isArray(a.points) && a.points.length === 4 && a.points.every(isNum)
+    ),
+  };
+};
 
 export const BoardStore = signalStore(
   { providedIn: 'root' },
@@ -73,6 +122,7 @@ export const BoardStore = signalStore(
     canUndo: computed(() => store.past().length > 0),
     canRedo: computed(() => store.future().length > 0),
     hasArrows: computed(() => store.arrows().length > 0),
+    frameCount: computed(() => store.frames().length),
   })),
   withMethods((store) => ({
     updatePosition(id: string, x: number, y: number) {
@@ -90,13 +140,11 @@ export const BoardStore = signalStore(
     clearArrows() {
       patchState(store, (state) => (state.arrows.length ? withHistory(state, { arrows: [] }) : {}));
     },
-    /** Restores the starting formation and removes all arrows (undoable). */
+    /** Restores the starting formation and removes all arrows of the current frame (undoable). */
     reset() {
-      patchState(store, (state) =>
-        withHistory(state, { entities: initialState.entities, arrows: [] })
-      );
+      patchState(store, (state) => withHistory(state, { entities: INITIAL_ENTITIES, arrows: [] }));
     },
-    /** Replaces the whole board, e.g. when loading a saved one (undoable). */
+    /** Replaces the current frame, e.g. when loading a saved board (undoable). */
     replaceBoard(entities: TacticalEntity[], arrows: TacticalArrow[]) {
       patchState(store, (state) => withHistory(state, { entities, arrows }));
     },
@@ -106,8 +154,9 @@ export const BoardStore = signalStore(
         if (!prev) return {};
         return {
           ...prev,
+          frames: setFrame(state.frames, state.currentFrame, prev),
           past: state.past.slice(0, -1),
-          future: [{ entities: state.entities, arrows: state.arrows }, ...state.future],
+          future: [snapshotOf(state), ...state.future],
         };
       });
     },
@@ -117,10 +166,72 @@ export const BoardStore = signalStore(
         if (!next) return {};
         return {
           ...next,
-          past: [...state.past, { entities: state.entities, arrows: state.arrows }],
+          frames: setFrame(state.frames, state.currentFrame, next),
+          past: [...state.past, snapshotOf(state)],
           future: state.future.slice(1),
         };
       });
+    },
+
+    // ---- Timeline ----
+    goToFrame(index: number) {
+      patchState(store, (state) =>
+        index === state.currentFrame || index < 0 || index >= state.frames.length
+          ? {}
+          : showFrame(state.frames, index)
+      );
+    },
+    /** New step after the current one: same positions, no arrows. */
+    addFrame() {
+      patchState(store, (state) => {
+        if (state.frames.length >= MAX_FRAMES) return {};
+        const frames = [...state.frames];
+        frames.splice(state.currentFrame + 1, 0, { entities: state.entities, arrows: [] });
+        return showFrame(frames, state.currentFrame + 1);
+      });
+    },
+    /** Copy of the current step, including its arrows. */
+    duplicateFrame() {
+      patchState(store, (state) => {
+        if (state.frames.length >= MAX_FRAMES) return {};
+        const frames = [...state.frames];
+        frames.splice(state.currentFrame + 1, 0, snapshotOf(state));
+        return showFrame(frames, state.currentFrame + 1);
+      });
+    },
+    deleteFrame() {
+      patchState(store, (state) => {
+        if (state.frames.length < 2) return {};
+        const frames = state.frames.filter((_, i) => i !== state.currentFrame);
+        return showFrame(frames, Math.min(state.currentFrame, frames.length - 1));
+      });
+    },
+    setStepDuration(ms: number) {
+      patchState(store, { stepDurationMs: clampStep(ms) });
+    },
+
+    /** Serializable copy of the whole timeline. */
+    exportBoard() {
+      return {
+        version: 2,
+        frames: store.frames(),
+        currentFrame: store.currentFrame(),
+        stepDurationMs: store.stepDurationMs(),
+      };
+    },
+    /** Loads a saved timeline (or a legacy single-board save). Returns false if the data is unusable. */
+    importBoard(data: any): boolean {
+      if (typeof data !== 'object' || data === null) return false;
+      const rawFrames = Array.isArray(data.frames) && data.frames.length ? data.frames.slice(0, MAX_FRAMES) : [data];
+      const frames = rawFrames.map(sanitizeFrame);
+      const index = isNum(data.currentFrame)
+        ? Math.min(frames.length - 1, Math.max(0, Math.floor(data.currentFrame)))
+        : 0;
+      patchState(store, (state) => ({
+        ...showFrame(frames, index),
+        stepDurationMs: isNum(data.stepDurationMs) ? clampStep(data.stepDurationMs) : state.stepDurationMs,
+      }));
+      return true;
     },
   }))
 );
