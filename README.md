@@ -1,74 +1,125 @@
 # Tactical Board Next
 
-A modern, responsive, browser-based tactical football board for match analysis. Move players, draw movement and passing arrows, overlay tactical zones, and save your boards, all running smoothly at 60fps.
+A modern, responsive, browser-based football tactical board for match analysis and coaching presentations. Drag players and the ball at 60fps, sketch curved tactical arrows in four distinct styles, overlay analytical pitch divisions, animate multi-step plays on a keyframe timeline, and export HD `.mp4` videos directly in the browser.
 
-![Tactical board with drawn arrows](docs/board-arrows.png)
+![Animated tactical sequence with arrows and player movements](docs/board-animation.gif)
+
+> **Exported Video Demo:** [Download / Watch `docs/tactical-board-demo.mp4`](docs/tactical-board-demo.mp4) *(1280×720 HD, 30 fps, H.264 Main Profile + AAC, exported directly from the browser via FFmpeg.wasm)*
+
+---
 
 ## Features
 
-### Full 11v11 setup
-A 105×68 m pitch with all line markings and a complete 4-3-3 (red) vs 4-2-3-1 (blue) setup, plus a classic black-and-white ball. Every token can be dragged with the mouse or a finger, and is kept inside the pitch lines.
+### 1. Full 11v11 Pitch & Classic Match Ball
+- **Proportional 105×68 m pitch:** Complete markings including halfway line, center circle, penalty areas, 6-yard goal boxes, penalty spots, penalty arcs, corner arcs, and goals.
+- **Complete starting formations:** **4-3-3** (Red) vs **4-2-3-1** (Blue), plus a classic black-and-white pentagon match ball.
+- **Boundary-clamped 60fps drag & drop:** Every player token and the ball can be dragged smoothly with mouse or touch and is automatically kept inside the pitch boundaries.
 
-### Tactical arrows (Pass, Run, Dribble, Target Zone) & curved paths
-Switch on **Draw Tactical Arrows** (or click any arrow style button directly) to freeze the players and sketch lines in four distinct tactical styles:
+---
 
-- **Pass:** solid yellow arrow for ball passes
-- **Run:** dashed arrow for off-the-ball player runs
-- **Dribble:** wavy arrow for ball-carrier dribbles
-- **Target Zone:** dashed movement arrow pointing into a highlighted empty-space circle to show a player exploiting open space
+### 2. Tactical Arrows (`Pass | Run | Dribble | Target Zone`) & Curved Paths
+Click **Draw Tactical Arrows** — or click any arrow style button directly (`Pass`, `Run`, `Dribble`, `Target Zone`) — to enter drawing mode and sketch tactical movements directly from the center of any player token on the first click:
 
-You can start drawing directly on top of any player token on the first click. Every drawn arrow has a draggable midpoint handle so you can bend any pass, run, dribble or target-zone movement into a smooth curve. Stray taps are ignored, and arrows live in the store, so they take part in undo/redo, save and load.
+| Style | Visual | Coaching Purpose |
+| :--- | :--- | :--- |
+| **Pass** | Solid yellow arrow | Ball passes, switches of play, crosses, and shots on goal |
+| **Run** | Dashed yellow arrow | Off-the-ball player runs, overlaps, underlaps, and pressing triggers |
+| **Dribble** | Wavy sinusoidal arrow | Ball-carrier dribbles and driving into open space |
+| **Target Zone** | Dashed arrow pointing into a highlighted circular zone | Instructing a player to move into or attack a specific empty space |
 
-![Tactical arrows](docs/board-arrows.png)
+- **Curved trajectories:** Every drawn arrow exposes a draggable **midpoint control handle** (white circle with amber ring) so you can bend any pass, run, dribble, or target-zone movement into a smooth quadratic Bézier curve.
+- **Store-backed history:** Arrows belong to the active keyframe and participate in **Undo**, **Redo**, **Clear Arrows**, **Duplicate Frame**, **Save**, and **Load**.
 
-### Pitch divisions overlay
-Toggle **Pitch Divisions** to show the analytical zones:
+![Tactical arrows — Pass, Run, Dribble, and Target Zone with curved handles](docs/board-arrows.png)
 
-- Defensive, middle and final thirds
-- Five vertical channels: left wing, left half-space, centre, right half-space, right wing
-- Highlighted half-spaces and both penalty areas
+---
 
-The centre channel matches the width of the 6-yard box, and the half-spaces fill the rest of the penalty-area width.
+### 3. Pitch Divisions & Analytical Zones Overlay
+Toggle **Pitch Divisions** to overlay standard coaching analysis zones above the grass and beneath the players:
+
+- **Three horizontal thirds:** *Defensive third*, *Middle third*, and *Final third*
+- **Five vertical channels:**
+  - *Left wing*
+  - *Left half-space* (highlighted amber tint)
+  - *Centre* (aligned to the width of the 6-yard box)
+  - *Right half-space* (highlighted amber tint)
+  - *Right wing*
+- **Highlighted penalty areas:** Subtle analytical tint over both 18-yard boxes.
 
 ![Pitch divisions overlay](docs/board-divisions.png)
 
-### Timeline and animation
-Build a play step by step with keyframes. Set up the first frame, press **+ Frame**, and move the pieces for the next phase.
+---
 
-- **Animated playback:** pieces glide between frames with ease-in-out, and each frame's arrows fade in. The step duration is adjustable (0.3 to 3 s).
-- **Frame tools:** add a frame (same positions, no arrows), duplicate one (with its arrows), delete one, or jump to any frame with the numbered chips or the `←` / `→` keys.
-- **Scrub slider:** drag to preview the movement between two frames, and release to snap to the nearest one.
-- **Ghosting:** faded tokens and dashed trails show where every piece stood in the previous frame, so you can see each movement while editing.
-- **Per-frame arrows:** a pass or run is drawn in the step where it happens.
-- **Client-side MP4 export:** click **Export MP4** to render the interpolated 30 fps keyframe transitions in the browser with FFmpeg.wasm and download a ready-to-share `tactical-board.mp4` video.
-- The board is locked during playback and export, so nothing moves by accident.
+### 4. Keyframe Timeline, Animated Playback, Scrubber & Ghosting
+Build multi-phase tactical plays step by step:
 
-![Timeline with ghost trails](docs/board-timeline.png)
+- **Keyframe management:**
+  - **`+ Frame`** inserts a new step after the current frame, preserving player and ball positions with a clean arrow layer for the next phase.
+  - **`Duplicate`** clones the current frame including all of its drawn arrows.
+  - **`Delete`** removes the current frame when more than one frame exists.
+  - **`< 1 2 3 >` chips & `←` / `→` arrow keys** jump directly to any keyframe.
+- **Smooth `Konva.Tween` playback (`Play / Stop`):**
+  - Players and the ball glide smoothly between frames with `EaseInOut` interpolation while tactical arrows animate across phases.
+  - Adjustable **Step duration slider** (`0.3s` to `3.0s` per transition).
+- **Interactive `Scrub` slider:**
+  - Drag continuously across the timeline to preview exact interpolated player positions between any two keyframes; release to snap to the nearest frame.
+- **Ghost previous frame (`Ghost previous frame` toggle):**
+  - Displays faded ghost tokens (`30%` opacity) and dashed movement trails connecting each player's previous-frame position to their current position while editing.
 
-### Undo, redo, reset and save/load
-- **Undo / Redo** for every player move, arrow and clear within a frame (also `Ctrl+Z`, `Ctrl+Y` and `Ctrl+Shift+Z`, with `Cmd` on Mac)
-- **Clear Arrows** to wipe the drawings of the current frame
-- **Reset** to return the current frame to the starting formation (undoable)
-- **Save / Load** to keep the whole timeline in your browser's local storage; loading validates the data, and boards saved before the timeline existed still load
+![Timeline with ghost trails and scrub controls](docs/board-timeline.png)
+
+---
+
+### 5. Client-Side MP4 Video Export (`FFmpeg.wasm`)
+Click **Export MP4** in the timeline bar to render and download your entire tactical sequence as a standalone `.mp4` video without any backend server:
+
+- **Smooth 30 fps frame synthesis:** Captures an initial hold, interpolates every transition step at 30 fps with `EaseInOut` player motion and arrow transitions, and holds the final frame.
+- **Universal Windows / macOS / Mobile compatibility:**
+  - Encoded at **1280×720 HD** (`SAR 1:1`, `DAR 16:9`, macroblock-aligned) using **H.264 Main Profile (`libx264`, Level 3.1, `yuv420p`, `BT.709`)** + stereo **AAC** audio track in an `mp42` (`+faststart`) container.
+  - Opens out of the box in **Windows 11 Media Player**, **Windows Media Player Legacy**, **QuickTime**, **VLC**, web browsers, and social/messaging platforms.
+- **Sample exported video:** [`docs/tactical-board-demo.mp4`](docs/tactical-board-demo.mp4)
+
+![3-frame tactical play and MP4 export](docs/board-export-mp4.png)
+
+---
+
+### 6. Undo / Redo, Keyboard Shortcuts, Save / Load & Reset
+- **Per-frame Undo / Redo:** Tracks every player drag, ball move, arrow draw, curve adjustment, clear, and formation reset within each frame.
+- **Browser persistence (`Save` / `Load`):** Saves the entire multi-frame timeline, player coordinates, arrow styles, curve control points, and step duration to `localStorage` (`tactical-board:v1`), with backward-compatible validation for single-frame boards.
+- **Formation `Reset`:** Restores the current frame to the default 11v11 kickoff setup (undoable).
+
+| Shortcut | Action |
+| :--- | :--- |
+| `Ctrl + Z` (`Cmd + Z` on Mac) | Undo last action in the current frame |
+| `Ctrl + Y` or `Ctrl + Shift + Z` | Redo last undone action in the current frame |
+| `←` / `→` | Step to previous / next timeline frame |
 
 ![Controls and saved board](docs/board-controls.png)
 
-### Responsive by design
-A `ResizeObserver` keeps the Konva stage scaled to its container without losing coordinate accuracy, so the board works on desktop, tablet and phone.
+---
+
+### 7. Responsive by Design
+A `ResizeObserver` dynamically scales the Konva stage to fit its container while keeping all internal coordinates normalized to `1050×680`, ensuring crisp rendering and accurate pointer math across desktop monitors, tablets, and mobile screens.
+
+---
 
 ## Tech Stack
 
-- **Angular**: standalone components, signals, OnPush change detection
-- **NgRx Signals**: single store for the timeline frames, player positions, arrows and undo/redo history
-- **Konva.js**: used natively outside the Angular zone for smooth rendering
-- **FFmpeg.wasm**: client-side 30 fps H.264 MP4 video encoding directly in the browser
-- **Tailwind CSS v3**
+- **Angular 19**: Standalone components, Angular Signals, `OnPush` change detection
+- **NgRx Signals (`@ngrx/signals`)**: Single source of truth for timeline frames, entity positions, arrow styles/curves, and per-frame undo/redo stacks
+- **Konva.js**: 2D HTML5 Canvas engine running outside the Angular zone (`NgZone.runOutsideAngular`) for 60fps interaction
+- **FFmpeg.wasm (`@ffmpeg/core`)**: In-browser WebAssembly video encoding (`libx264` + `aac`)
+- **Tailwind CSS v3**: Dark tactical UI styling
 
 ## Architecture Notes
 
-- The store is the single source of truth. An `effect()` syncs the Konva nodes from it, which is what makes undo/redo, load, reset and frame switching work, and it is the base for the upcoming AI feature and video export.
-- During playback Konva tweens drive the nodes directly, and the store is only updated when playback stops.
-- Konva has separate layers for the pitch, the divisions overlay, the ghost frame, the drawings and the players.
+- `BoardStore` (`src/app/pitch-board/board.store.ts`) is the single source of truth. An Angular `effect()` synchronizes Konva nodes from store state whenever the active frame, entities, or arrows change.
+- Konva uses five dedicated layers for clean separation of concerns:
+  1. `pitchLayer` — grass, pitch lines, penalty boxes, and goals
+  2. `divisionsLayer` — analytical thirds, channels, and half-space highlights
+  3. `ghostLayer` — previous-frame faded tokens and dashed movement trails
+  4. `drawingLayer` — `Pass`, `Run`, `Dribble`, and `Target Zone` arrows + curve handles
+  5. `entityLayer` — draggable red/blue player tokens and the classic football
 
 ## Getting Started
 
@@ -77,18 +128,18 @@ npm install
 ng serve
 ```
 
-Then open http://localhost:4200.
+Then open `http://localhost:4200/` in your browser.
 
 ## Roadmap
 
-- [x] Pitch, players, drag & drop, responsive canvas
+- [x] Proportional 11v11 pitch, classic football, and boundary-clamped 60fps drag & drop
 - [x] Drawing mode for tactical arrows
-- [x] Undo / redo / clear, keyboard shortcuts, reset, save & load
-- [x] Pitch divisions overlay
-- [x] Timeline engine: keyframes, animated playback, scrubber, ghosting
-- [x] Client-side MP4 export with FFmpeg.wasm
-- [x] Arrow styles (pass, run, dribble) and curved arrows
-- [ ] AI-driven tactical setups via natural language
+- [x] Undo / redo / clear, keyboard shortcuts (`Ctrl+Z` / `Ctrl+Y`), reset, and `localStorage` save & load
+- [x] Pitch divisions overlay (thirds, 5 vertical channels, highlighted half-spaces & penalty areas)
+- [x] Keyframe timeline engine: multi-frame playback, scrub slider, step duration control, and ghost trails
+- [x] Client-side 720p H.264 MP4 video export with FFmpeg.wasm
+- [x] Four tactical arrow styles (`Pass`, `Run`, `Dribble`, `Target Zone`) and interactive curved arrow handles
+- [ ] AI-driven tactical setups via natural language (planned in a dedicated phase)
 
 ## Author
 

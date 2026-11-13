@@ -505,8 +505,9 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     const seconds = this.store.stepDurationMs() / 1000;
     this.ghostLayer.destroyChildren();
     this.ghostLayer.batchDraw();
-    this.renderArrows(frames[to].arrows);
-    this.drawingLayer.opacity(0);
+    const stepArrows = frames[to].arrows.length > 0 ? frames[to].arrows : frames[from].arrows;
+    this.renderArrows(stepArrows);
+    this.drawingLayer.opacity(frames[to].arrows.length > 0 ? 0 : 1);
 
     const tweens: Konva.Tween[] = [];
     frames[to].entities.forEach(e => {
@@ -617,7 +618,8 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
         const fromFrame = frames[step];
         const toFrame = frames[step + 1];
         const nextMap = new Map(toFrame.entities.map(e => [e.id, e]));
-        this.renderArrows(toFrame.arrows);
+        const hasFromArrows = fromFrame.arrows.length > 0;
+        const hasToArrows = toFrame.arrows.length > 0;
 
         for (let f = 1; f <= framesPerStep; f++) {
           const linear = f / framesPerStep;
@@ -629,7 +631,21 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
               node.position({ x: a.x + (b.x - a.x) * progress, y: a.y + (b.y - a.y) * progress });
             }
           });
-          this.drawingLayer.opacity(progress);
+          if (hasFromArrows && hasToArrows) {
+            if (linear < 0.5) {
+              this.renderArrows(fromFrame.arrows);
+              this.drawingLayer.opacity(1 - linear * 0.6);
+            } else {
+              this.renderArrows(toFrame.arrows);
+              this.drawingLayer.opacity(0.4 + (linear - 0.5) * 1.2);
+            }
+          } else if (hasToArrows) {
+            this.renderArrows(toFrame.arrows);
+            this.drawingLayer.opacity(progress);
+          } else {
+            this.renderArrows(fromFrame.arrows);
+            this.drawingLayer.opacity(1);
+          }
           this.entityLayer.batchDraw();
           this.drawingLayer.batchDraw();
 
@@ -780,7 +796,9 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
       node.position({ x: a.x + (b.x - a.x) * progress, y: a.y + (b.y - a.y) * progress });
     });
 
-    this.renderArrows(frames[t - i < 0.5 ? i : i + 1].arrows);
+    const primaryArrows = frames[t - i < 0.5 ? i : i + 1].arrows;
+    const fallbackArrows = frames[t - i < 0.5 ? i + 1 : i].arrows;
+    this.renderArrows(primaryArrows.length > 0 ? primaryArrows : fallbackArrows);
     this.ghostLayer.destroyChildren();
     this.ghostLayer.batchDraw();
     this.entityLayer.batchDraw();
