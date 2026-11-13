@@ -9,9 +9,13 @@ export interface TacticalEntity {
   label?: string; // Added to hold the player number
 }
 
+export type ArrowStyle = 'pass' | 'run' | 'dribble';
+
 export interface TacticalArrow {
   id: string;
   points: [number, number, number, number];
+  style?: ArrowStyle;
+  controlPoint?: [number, number];
 }
 
 interface Snapshot {
@@ -101,6 +105,8 @@ const showFrame = (frames: Snapshot[], index: number): Partial<State> => ({
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 const clampStep = (ms: number) => Math.min(MAX_STEP_MS, Math.max(MIN_STEP_MS, Math.round(ms)));
 
+const isArrowStyle = (v: unknown): v is ArrowStyle => v === 'pass' || v === 'run' || v === 'dribble';
+
 /** Rebuilds a frame from untrusted data, keeping only known players and valid arrows. */
 const sanitizeFrame = (raw: any): Snapshot => {
   const saved = new Map<string, { x: number; y: number }>();
@@ -109,9 +115,16 @@ const sanitizeFrame = (raw: any): Snapshot => {
   });
   return {
     entities: INITIAL_ENTITIES.map((e) => ({ ...e, ...(saved.get(e.id) ?? {}) })),
-    arrows: (Array.isArray(raw?.arrows) ? raw.arrows : []).filter(
-      (a: any) => typeof a?.id === 'string' && Array.isArray(a.points) && a.points.length === 4 && a.points.every(isNum)
-    ),
+    arrows: (Array.isArray(raw?.arrows) ? raw.arrows : [])
+      .filter((a: any) => typeof a?.id === 'string' && Array.isArray(a.points) && a.points.length === 4 && a.points.every(isNum))
+      .map((a: any): TacticalArrow => ({
+        id: a.id,
+        points: [a.points[0], a.points[1], a.points[2], a.points[3]],
+        style: isArrowStyle(a.style) ? a.style : 'pass',
+        ...(Array.isArray(a.controlPoint) && a.controlPoint.length === 2 && a.controlPoint.every(isNum)
+          ? { controlPoint: [a.controlPoint[0], a.controlPoint[1]] }
+          : {}),
+      })),
   };
 };
 
@@ -132,9 +145,16 @@ export const BoardStore = signalStore(
         })
       );
     },
-    addArrow(points: [number, number, number, number]) {
+    addArrow(points: [number, number, number, number], style: ArrowStyle = 'pass') {
       patchState(store, (state) =>
-        withHistory(state, { arrows: [...state.arrows, { id: crypto.randomUUID(), points }] })
+        withHistory(state, { arrows: [...state.arrows, { id: crypto.randomUUID(), points, style }] })
+      );
+    },
+    updateArrowControl(id: string, controlPoint: [number, number]) {
+      patchState(store, (state) =>
+        withHistory(state, {
+          arrows: state.arrows.map((a) => (a.id === id ? { ...a, controlPoint } : a)),
+        })
       );
     },
     clearArrows() {

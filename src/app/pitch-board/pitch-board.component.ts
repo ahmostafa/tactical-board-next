@@ -1,6 +1,6 @@
 import { Component, ElementRef, ViewChild, AfterViewInit, OnDestroy, NgZone, ChangeDetectionStrategy, inject, signal, effect, computed, HostListener } from '@angular/core';
 import Konva from 'konva';
-import { BoardStore, TacticalEntity } from './board.store';
+import { BoardStore, TacticalEntity, TacticalArrow, ArrowStyle } from './board.store';
 
 const STORAGE_KEY = 'tactical-board:v1';
 
@@ -11,13 +11,30 @@ const STORAGE_KEY = 'tactical-board:v1';
   template: `
     <div class="w-full max-w-5xl mx-auto p-4">
       <!-- Toolbar -->
-      <fieldset class="flex flex-wrap gap-4 mb-4 border-0 p-0 m-0 min-w-0" [disabled]="isPlaying()">
+      <fieldset class="flex flex-wrap gap-4 mb-4 border-0 p-0 m-0 min-w-0" [disabled]="isPlaying() || isExporting()">
         <button (click)="toggleDrawingMode()"
                 class="px-4 py-2 text-white font-bold rounded shadow-md transition-colors"
                 [class.bg-blue-600]="!isDrawingMode()"
                 [class.bg-red-600]="isDrawingMode()">
           {{ isDrawingMode() ? 'Stop Drawing (Back to Dragging)' : 'Draw Tactical Arrows' }}
         </button>
+        <div class="inline-flex rounded shadow-md overflow-hidden" role="group" aria-label="Arrow style">
+          <button (click)="arrowStyle.set('pass')"
+                  class="px-3 py-2 text-xs font-bold text-white transition-colors"
+                  [class.bg-amber-600]="arrowStyle() === 'pass'"
+                  [class.bg-gray-700]="arrowStyle() !== 'pass'"
+                  title="Solid arrow for passes">Pass</button>
+          <button (click)="arrowStyle.set('run')"
+                  class="px-3 py-2 text-xs font-bold text-white border-x border-gray-600 transition-colors"
+                  [class.bg-amber-600]="arrowStyle() === 'run'"
+                  [class.bg-gray-700]="arrowStyle() !== 'run'"
+                  title="Dashed arrow for off-the-ball runs">Run</button>
+          <button (click)="arrowStyle.set('dribble')"
+                  class="px-3 py-2 text-xs font-bold text-white transition-colors"
+                  [class.bg-amber-600]="arrowStyle() === 'dribble'"
+                  [class.bg-gray-700]="arrowStyle() !== 'dribble'"
+                  title="Wavy arrow for ball carrier dribbles">Dribble</button>
+        </div>
         <button (click)="toggleDivisions()"
                 class="px-4 py-2 text-white font-bold rounded shadow-md transition-colors"
                 [class.bg-gray-700]="!showDivisions()"
@@ -48,14 +65,14 @@ const STORAGE_KEY = 'tactical-board:v1';
       <div class="mt-4 p-3 rounded-md bg-gray-800 text-white flex flex-col gap-3">
         <div class="flex flex-wrap items-center gap-3">
           <button (click)="isPlaying() ? stopPlayback() : play()"
-                  [disabled]="!isPlaying() && store.frameCount() < 2"
+                  [disabled]="isExporting() || (!isPlaying() && store.frameCount() < 2)"
                   class="px-4 py-2 font-bold rounded shadow-md disabled:opacity-40"
                   [class.bg-blue-600]="!isPlaying()"
                   [class.bg-red-600]="isPlaying()">
             {{ isPlaying() ? 'Stop' : 'Play' }}
           </button>
 
-          <fieldset class="flex flex-wrap items-center gap-2 border-0 p-0 m-0 min-w-0" [disabled]="isPlaying()">
+          <fieldset class="flex flex-wrap items-center gap-2 border-0 p-0 m-0 min-w-0" [disabled]="isPlaying() || isExporting()">
             <button (click)="store.goToFrame(store.currentFrame() - 1)" [disabled]="store.currentFrame() === 0"
                     class="px-3 py-2 bg-gray-700 rounded disabled:opacity-40" aria-label="Previous frame">&lt;</button>
             @for (i of frameIndexes(); track i) {
@@ -74,6 +91,11 @@ const STORAGE_KEY = 'tactical-board:v1';
                     title="Copy this step including its arrows">Duplicate</button>
             <button (click)="deleteFrame()" [disabled]="store.frameCount() < 2"
                     class="px-3 py-2 bg-gray-700 rounded text-sm font-bold disabled:opacity-40">Delete</button>
+            <button (click)="exportMp4()" [disabled]="store.frameCount() < 2"
+                    class="px-3 py-2 bg-purple-700 hover:bg-purple-600 rounded text-sm font-bold disabled:opacity-40"
+                    title="Render the timeline into a downloadable MP4 video">
+              {{ isExporting() ? 'Exporting (' + exportProgress() + '%)' : 'Export MP4' }}
+            </button>
           </fieldset>
         </div>
 
@@ -82,7 +104,7 @@ const STORAGE_KEY = 'tactical-board:v1';
             Scrub
             <input type="range" class="w-full" min="0" step="0.01"
                    [max]="store.frameCount() - 1" [value]="scrubPos()"
-                   [disabled]="isPlaying() || store.frameCount() < 2"
+                   [disabled]="isPlaying() || isExporting() || store.frameCount() < 2"
                    (input)="onScrub($event)" (change)="onScrubEnd()" />
           </label>
           <label class="flex items-center gap-2">
@@ -110,7 +132,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     // While the animation plays, Konva drives the nodes itself.
     effect(() => {
       this.showGhost();
-      if (this.isPlaying()) return;
+      if (this.isPlaying() || this.isExporting()) return;
       this.syncFromStore();
     });
   }
@@ -129,7 +151,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
       if (node && (node.x() !== e.x || node.y() !== e.y)) node.position({ x: e.x, y: e.y });
     });
 
-    this.renderArrows(arrows);
+    this.renderArrows(arrows, !this.isPlaying() && !this.isExporting());
     this.drawingLayer.opacity(1);
     this.renderGhost(ghost && current > 0 ? frames[current - 1].entities : null, entities);
     this.scrubPos.set(current);
@@ -139,9 +161,47 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     this.ghostLayer.batchDraw();
   }
 
-  private renderArrows(arrows: { points: number[] }[]) {
+  private renderArrows(arrows: TacticalArrow[], showHandles = false) {
     this.drawingLayer.destroyChildren();
-    arrows.forEach(a => this.drawingLayer.add(this.createArrow(a.points)));
+    arrows.forEach(a => {
+      const arrowNode = this.createArrow(a);
+      this.drawingLayer.add(arrowNode);
+
+      if (showHandles) {
+        const [x1, y1, x2, y2] = a.points;
+        const [cx, cy] = a.controlPoint ?? [(x1 + x2) / 2, (y1 + y2) / 2];
+        const handle = new Konva.Circle({
+          x: cx,
+          y: cy,
+          radius: 6,
+          fill: '#ffffff',
+          stroke: '#f1c40f',
+          strokeWidth: 2,
+          opacity: 0.85,
+          draggable: true,
+          dragBoundFunc: (pos) => {
+            const scale = this.stage.scaleX();
+            return {
+              x: Math.max(6 * scale, Math.min(pos.x, (this.BASE_WIDTH - 6) * scale)),
+              y: Math.max(6 * scale, Math.min(pos.y, (this.BASE_HEIGHT - 6) * scale)),
+            };
+          },
+        });
+        handle.on('mouseenter', () => { this.stage.container().style.cursor = 'grab'; });
+        handle.on('mouseleave', () => { this.stage.container().style.cursor = 'default'; });
+        handle.on('dragmove', () => {
+          const p = handle.position();
+          arrowNode.points(this.computeArrowPath(a.points, a.style ?? 'pass', [p.x, p.y]));
+        });
+        handle.on('dragend', () => {
+          const p = handle.position();
+          this.ngZone.run(() =>
+            this.store.updateArrowControl(a.id, [Math.round(p.x), Math.round(p.y)])
+          );
+        });
+        this.drawingLayer.add(handle);
+      }
+    });
   }
 
   /** Faded tokens and dashed trails showing where each piece stood in the previous frame. */
@@ -178,24 +238,97 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     });
   }
 
-  private createArrow(points: number[]): Konva.Arrow {
+  private createArrow(arrow: Pick<TacticalArrow, 'points' | 'style' | 'controlPoint'>): Konva.Arrow {
+    const style = arrow.style ?? 'pass';
+    const pathPoints = this.computeArrowPath(arrow.points, style, arrow.controlPoint);
     return new Konva.Arrow({
-      points,
+      points: pathPoints,
       pointerLength: 15,
       pointerWidth: 15,
       fill: '#f1c40f',
       stroke: '#f1c40f',
       strokeWidth: 4,
+      dash: style === 'run' ? [12, 8] : undefined,
+      tension: style === 'dribble' ? 0.35 : 0,
       lineCap: 'round',
-      lineJoin: 'round'
+      lineJoin: 'round',
+      listening: false,
     });
+  }
+
+  /** Computes sampled points along a straight/curved line, adding sine waves for dribbles. */
+  private computeArrowPath(
+    points: [number, number, number, number],
+    style: ArrowStyle,
+    controlPoint?: [number, number]
+  ): number[] {
+    const [x1, y1, x2, y2] = points;
+    const dist = Math.hypot(x2 - x1, y2 - y1);
+    if (dist < 2) return [x1, y1, x2, y2];
+
+    const mx = (x1 + x2) / 2;
+    const my = (y1 + y2) / 2;
+    const [cx, cy] = controlPoint ?? [mx, my];
+    const isCurved = Math.hypot(cx - mx, cy - my) > 1.5;
+
+    // Quadratic Bezier control point so the curve passes directly through the handle (cx, cy) at t = 0.5
+    const qx = 2 * cx - 0.5 * (x1 + x2);
+    const qy = 2 * cy - 0.5 * (y1 + y2);
+
+    const pointAt = (t: number): [number, number] => {
+      if (!isCurved) return [x1 + (x2 - x1) * t, y1 + (y2 - y1) * t];
+      const u = 1 - t;
+      return [
+        u * u * x1 + 2 * u * t * qx + t * t * x2,
+        u * u * y1 + 2 * u * t * qy + t * t * y2,
+      ];
+    };
+
+    const tangentAt = (t: number): [number, number] => {
+      const dx = isCurved ? 2 * (1 - t) * (qx - x1) + 2 * t * (x2 - qx) : x2 - x1;
+      const dy = isCurved ? 2 * (1 - t) * (qy - y1) + 2 * t * (y2 - qy) : y2 - y1;
+      const len = Math.hypot(dx, dy) || 1;
+      return [dx / len, dy / len];
+    };
+
+    if (style === 'dribble') {
+      const waveLen = 20;
+      const amp = 5.5;
+      const cycles = Math.max(2, Math.round(dist / waveLen));
+      const steps = cycles * 6;
+      const out: number[] = [];
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const [bx, by] = pointAt(t);
+        // Keep the last 18px straight so the arrowhead points cleanly in the travel direction
+        const fade = t > 0.85 ? Math.max(0, (1 - t) / 0.15) : Math.min(1, t / 0.08);
+        const offset = Math.sin(t * cycles * Math.PI * 2) * amp * fade;
+        const [tx, ty] = tangentAt(t);
+        out.push(bx - ty * offset, by + tx * offset);
+      }
+      return out;
+    }
+
+    if (!isCurved) return [x1, y1, x2, y2];
+
+    const steps = 20;
+    const out: number[] = [];
+    for (let i = 0; i <= steps; i++) {
+      const [bx, by] = pointAt(i / steps);
+      out.push(bx, by);
+    }
+    return out;
   }
 
   // UI State
   isDrawingMode = signal(false);
+  arrowStyle = signal<ArrowStyle>('pass');
   showDivisions = signal(false);
   showGhost = signal(true);
   isPlaying = signal(false);
+  isExporting = signal(false);
+  exportProgress = signal(0);
+  private ffmpegCore?: any;
   scrubPos = signal(0);
   protected frameIndexes = computed(() => Array.from({ length: this.store.frameCount() }, (_, i) => i));
   hasSavedBoard = signal(localStorage.getItem(STORAGE_KEY) !== null);
@@ -204,7 +337,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
 
   @HostListener('window:keydown', ['$event'])
   onKeydown(event: KeyboardEvent) {
-    if (this.isPlaying()) return;
+    if (this.isPlaying() || this.isExporting()) return;
 
     // Frame navigation (ignored while a slider/input has focus so it keeps its own arrow-key behaviour)
     if (!(event.target instanceof HTMLInputElement)) {
@@ -330,8 +463,177 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
   }
 
   private updateDraggable() {
-    const draggable = !this.isDrawingMode() && !this.isPlaying();
+    const draggable = !this.isDrawingMode() && !this.isPlaying() && !this.isExporting();
     this.entityLayer.getChildren().forEach(group => group.draggable(draggable));
+  }
+
+  // ---- Client-side MP4 video export via FFmpeg.wasm ----
+  async exportMp4() {
+    if (this.isExporting() || this.isPlaying() || this.store.frameCount() < 2) return;
+    this.isExporting.set(true);
+    this.exportProgress.set(0);
+    this.updateDraggable();
+    this.showStatus('Loading FFmpeg.wasm...');
+
+    const writtenFiles: string[] = [];
+    try {
+      if (!this.ffmpegCore) {
+        // @ts-ignore - @ffmpeg/core does not ship .d.ts files
+        const mod: any = await import('@ffmpeg/core');
+        const createFFmpegCore = mod.default ?? mod;
+        const wasmUrl = new URL('@ffmpeg/core/wasm', import.meta.url).href;
+        const wasmBinary = await (await fetch(wasmUrl)).arrayBuffer();
+        this.ffmpegCore = await createFFmpegCore({ wasmBinary });
+      }
+      const core = this.ffmpegCore;
+
+      const frames = this.store.frames();
+      const fps = 30;
+      const framesPerStep = Math.max(6, Math.round((this.store.stepDurationMs() / 1000) * fps));
+      const holdStart = Math.round(fps * 0.4);
+      const holdEnd = Math.round(fps * 0.6);
+      const totalTransitions = frames.length - 1;
+      const totalVideoFrames = holdStart + totalTransitions * framesPerStep + holdEnd;
+
+      this.ghostLayer.destroyChildren();
+      this.ghostLayer.batchDraw();
+
+      const capturePng = (idx: number) => {
+        const scale = this.stage.scaleX();
+        const dataUrl = this.stage.toDataURL({
+          pixelRatio: 1 / scale,
+          mimeType: 'image/png',
+        });
+        const base64 = dataUrl.split(',')[1];
+        const bin = atob(base64);
+        const bytes = new Uint8Array(bin.length);
+        for (let k = 0; k < bin.length; k++) bytes[k] = bin.charCodeAt(k);
+        const name = `f_${String(idx).padStart(4, '0')}.png`;
+        core.FS.writeFile(name, bytes);
+        writtenFiles.push(name);
+      };
+
+      let frameIdx = 0;
+
+      // 1. Render initial keyframe hold
+      frames[0].entities.forEach(e => {
+        const node = this.entityLayer.findOne('#' + e.id);
+        if (node) node.position({ x: e.x, y: e.y });
+      });
+      this.renderArrows(frames[0].arrows);
+      this.drawingLayer.opacity(1);
+      this.entityLayer.batchDraw();
+      this.drawingLayer.batchDraw();
+
+      for (let h = 0; h < holdStart; h++) {
+        capturePng(frameIdx++);
+      }
+      this.exportProgress.set(Math.round((frameIdx / totalVideoFrames) * 60));
+      this.showStatus('Rendering tactical animation frames...');
+      await new Promise(r => setTimeout(r, 0));
+
+      // 2. Render interpolated transition steps
+      for (let step = 0; step < totalTransitions; step++) {
+        const fromFrame = frames[step];
+        const toFrame = frames[step + 1];
+        const nextMap = new Map(toFrame.entities.map(e => [e.id, e]));
+        this.renderArrows(toFrame.arrows);
+
+        for (let f = 1; f <= framesPerStep; f++) {
+          const linear = f / framesPerStep;
+          const progress = Konva.Easings.EaseInOut(linear, 0, 1, 1);
+          fromFrame.entities.forEach(a => {
+            const b = nextMap.get(a.id);
+            const node = this.entityLayer.findOne('#' + a.id);
+            if (b && node) {
+              node.position({ x: a.x + (b.x - a.x) * progress, y: a.y + (b.y - a.y) * progress });
+            }
+          });
+          this.drawingLayer.opacity(progress);
+          this.entityLayer.batchDraw();
+          this.drawingLayer.batchDraw();
+
+          capturePng(frameIdx++);
+          if (f % 5 === 0) {
+            this.exportProgress.set(Math.round((frameIdx / totalVideoFrames) * 60));
+            await new Promise(r => setTimeout(r, 0));
+          }
+        }
+      }
+
+      // 3. Hold final frame
+      this.drawingLayer.opacity(1);
+      this.drawingLayer.batchDraw();
+      for (let h = 0; h < holdEnd; h++) {
+        capturePng(frameIdx++);
+      }
+
+      // 4. Encode MP4 in FFmpeg.wasm
+      this.showStatus('Encoding MP4 video...');
+      this.exportProgress.set(65);
+      await new Promise(r => setTimeout(r, 20));
+
+      core.setProgress(({ progress }: { progress: number }) => {
+        if (Number.isFinite(progress)) {
+          this.ngZone.run(() =>
+            this.exportProgress.set(Math.min(99, 65 + Math.round(Math.max(0, Math.min(1, progress)) * 34)))
+          );
+        }
+      });
+
+      const runExec = (args: string[]) => {
+        core.setTimeout(-1);
+        core.exec(...args);
+        const ret = core.ret;
+        core.reset();
+        return ret;
+      };
+
+      const ret = runExec([
+        '-framerate', String(fps),
+        '-i', 'f_%04d.png',
+        '-c:v', 'libx264',
+        '-pix_fmt', 'yuv420p',
+        '-preset', 'ultrafast',
+        '-movflags', '+faststart',
+        'tactical-board.mp4',
+      ]);
+      if (ret !== 0) {
+        runExec([
+          '-framerate', String(fps),
+          '-i', 'f_%04d.png',
+          '-pix_fmt', 'yuv420p',
+          'tactical-board.mp4',
+        ]);
+      }
+
+      const data: Uint8Array = core.FS.readFile('tactical-board.mp4', { encoding: 'binary' });
+      writtenFiles.push('tactical-board.mp4');
+      const blob = new Blob([new Uint8Array(data)], { type: 'video/mp4' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'tactical-board.mp4';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+
+      this.exportProgress.set(100);
+      this.showStatus('MP4 exported (tactical-board.mp4)');
+    } catch (err) {
+      console.error('MP4 export failed:', err);
+      this.showStatus('MP4 export failed');
+    } finally {
+      if (this.ffmpegCore) {
+        for (const f of writtenFiles) {
+          try { this.ffmpegCore.FS.unlink(f); } catch {}
+        }
+      }
+      this.isExporting.set(false);
+      this.updateDraggable();
+      this.syncFromStore();
+    }
   }
 
   // ---- Scrubber: preview positions between two frames without changing the store ----
@@ -385,6 +687,8 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
 
   // Drawing State
   private currentArrow: Konva.Arrow | null = null;
+  private currentArrowStart: [number, number] = [0, 0];
+  private currentArrowEnd: [number, number] = [0, 0];
 
   private readonly BASE_WIDTH = 1050;
   private readonly BASE_HEIGHT = 680;
@@ -510,7 +814,10 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
   private setupDrawingEngine() {
     // 1. Start drawing the arrow on mouse/touch down
     this.stage.on('mousedown touchstart', (e) => {
-      if (!this.isDrawingMode() || this.isPlaying()) return;
+      if (!this.isDrawingMode() || this.isPlaying() || this.isExporting()) return;
+
+      // Ignore mousedown if the user clicked on a curve control handle
+      if (e.target !== this.stage) return;
 
       const pos = this.stage.getPointerPosition();
       if (!pos) return;
@@ -520,7 +827,12 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
       const internalX = pos.x / scale;
       const internalY = pos.y / scale;
 
-      this.currentArrow = this.createArrow([internalX, internalY, internalX, internalY]);
+      this.currentArrowStart = [internalX, internalY];
+      this.currentArrowEnd = [internalX, internalY];
+      this.currentArrow = this.createArrow({
+        points: [internalX, internalY, internalX, internalY],
+        style: this.arrowStyle(),
+      });
 
       this.drawingLayer.add(this.currentArrow);
     });
@@ -536,9 +848,11 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
       const internalX = pos.x / scale;
       const internalY = pos.y / scale;
 
-      // Update the end coordinates of the arrow
-      const points = this.currentArrow.points();
-      this.currentArrow.points([points[0], points[1], internalX, internalY]);
+      this.currentArrowEnd = [internalX, internalY];
+      const [x1, y1] = this.currentArrowStart;
+      this.currentArrow.points(
+        this.computeArrowPath([x1, y1, internalX, internalY], this.arrowStyle())
+      );
     });
 
     // 3. Finish drawing on mouse up
@@ -547,17 +861,24 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
       if (!arrow) return;
       this.currentArrow = null;
 
-      const [x1, y1, x2, y2] = arrow.points();
+      const [x1, y1] = this.currentArrowStart;
+      const [x2, y2] = this.currentArrowEnd;
       arrow.destroy(); // the store-driven effect re-renders committed arrows
       if (Math.hypot(x2 - x1, y2 - y1) < 10) {
         this.drawingLayer.batchDraw();
         return; // ignore accidental taps
       }
-      this.ngZone.run(() => this.store.addArrow([x1, y1, x2, y2]));
+      this.ngZone.run(() =>
+        this.store.addArrow(
+          [Math.round(x1), Math.round(y1), Math.round(x2), Math.round(y2)],
+          this.arrowStyle()
+        )
+      );
     });
   }
 
   private drawPitch() {
+    const turf = new Konva.Rect({ x: 0, y: 0, width: this.BASE_WIDTH, height: this.BASE_HEIGHT, fill: '#2e7d32', listening: false });
     const lineConfig = { stroke: 'rgba(255, 255, 255, 0.7)', strokeWidth: 3, listening: false };
 
     const boundary = new Konva.Rect({ x: 0, y: 0, width: this.BASE_WIDTH, height: this.BASE_HEIGHT, ...lineConfig });
@@ -568,7 +889,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     const leftGoalArea = new Konva.Rect({ x: 0, y: (this.BASE_HEIGHT - 183.2) / 2, width: 55, height: 183.2, ...lineConfig });
     const rightGoalArea = new Konva.Rect({ x: this.BASE_WIDTH - 55, y: (this.BASE_HEIGHT - 183.2) / 2, width: 55, height: 183.2, ...lineConfig });
 
-    this.pitchLayer.add(boundary, halfwayLine, centerCircle, leftBox, rightBox, leftGoalArea, rightGoalArea);
+    this.pitchLayer.add(turf, boundary, halfwayLine, centerCircle, leftBox, rightBox, leftGoalArea, rightGoalArea);
   }
 
   /** Classic black & white football: white sphere, black centre pentagon, surrounding patches. */
