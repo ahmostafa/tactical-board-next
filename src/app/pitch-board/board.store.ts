@@ -90,6 +90,16 @@ export const BoardStore = signalStore(
     clearArrows() {
       patchState(store, (state) => (state.arrows.length ? withHistory(state, { arrows: [] }) : {}));
     },
+    /** Restores the starting formation and removes all arrows (undoable). */
+    reset() {
+      patchState(store, (state) =>
+        withHistory(state, { entities: initialState.entities, arrows: [] })
+      );
+    },
+    /** Replaces the whole board, e.g. when loading a saved one (undoable). */
+    replaceBoard(entities: TacticalEntity[], arrows: TacticalArrow[]) {
+      patchState(store, (state) => withHistory(state, { entities, arrows }));
+    },
     undo() {
       patchState(store, (state) => {
         const prev = state.past[state.past.length - 1];

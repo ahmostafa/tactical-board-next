@@ -1,6 +1,8 @@
-import { Component, ElementRef, ViewChild, AfterViewInit, OnDestroy, NgZone, ChangeDetectionStrategy, inject, signal, effect } from '@angular/core';
+import { Component, ElementRef, ViewChild, AfterViewInit, OnDestroy, NgZone, ChangeDetectionStrategy, inject, signal, effect, HostListener } from '@angular/core';
 import Konva from 'konva';
 import { BoardStore } from './board.store';
+
+const STORAGE_KEY = 'tactical-board:v1';
 
 @Component({
   selector: 'app-pitch-board',
@@ -9,12 +11,18 @@ import { BoardStore } from './board.store';
   template: `
     <div class="w-full max-w-5xl mx-auto p-4">
       <!-- Toolbar -->
-      <div class="flex gap-4 mb-4">
+      <div class="flex flex-wrap gap-4 mb-4">
         <button (click)="toggleDrawingMode()"
                 class="px-4 py-2 text-white font-bold rounded shadow-md transition-colors"
                 [class.bg-blue-600]="!isDrawingMode()"
                 [class.bg-red-600]="isDrawingMode()">
           {{ isDrawingMode() ? 'Stop Drawing (Back to Dragging)' : 'Draw Tactical Arrows' }}
+        </button>
+        <button (click)="toggleDivisions()"
+                class="px-4 py-2 text-white font-bold rounded shadow-md transition-colors"
+                [class.bg-gray-700]="!showDivisions()"
+                [class.bg-emerald-600]="showDivisions()">
+          Pitch Divisions
         </button>
         <button (click)="store.undo()" [disabled]="!store.canUndo()"
                 class="px-4 py-2 bg-gray-700 text-white font-bold rounded shadow-md disabled:opacity-40">Undo</button>
@@ -22,6 +30,15 @@ import { BoardStore } from './board.store';
                 class="px-4 py-2 bg-gray-700 text-white font-bold rounded shadow-md disabled:opacity-40">Redo</button>
         <button (click)="store.clearArrows()" [disabled]="!store.hasArrows()"
                 class="px-4 py-2 bg-gray-700 text-white font-bold rounded shadow-md disabled:opacity-40">Clear Arrows</button>
+        <button (click)="saveBoard()"
+                class="px-4 py-2 bg-emerald-700 text-white font-bold rounded shadow-md">Save</button>
+        <button (click)="loadBoard()" [disabled]="!hasSavedBoard()"
+                class="px-4 py-2 bg-emerald-700 text-white font-bold rounded shadow-md disabled:opacity-40">Load</button>
+        <button (click)="resetBoard()"
+                class="px-4 py-2 bg-gray-700 text-white font-bold rounded shadow-md">Reset</button>
+        @if (statusMessage()) {
+          <span class="self-center text-sm text-gray-300">{{ statusMessage() }}</span>
+        }
       </div>
 
       <!-- The Canvas Container -->
@@ -69,11 +86,75 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
 
   // UI State
   isDrawingMode = signal(false);
+  showDivisions = signal(false);
+  hasSavedBoard = signal(localStorage.getItem(STORAGE_KEY) !== null);
+  statusMessage = signal('');
+  private statusTimer?: ReturnType<typeof setTimeout>;
+
+  @HostListener('window:keydown', ['$event'])
+  onKeydown(event: KeyboardEvent) {
+    if (!(event.ctrlKey || event.metaKey)) return;
+    const key = event.key.toLowerCase();
+    if (key === 'z' && !event.shiftKey) {
+      event.preventDefault();
+      this.store.undo();
+    } else if (key === 'y' || (key === 'z' && event.shiftKey)) {
+      event.preventDefault();
+      this.store.redo();
+    }
+  }
+
+  resetBoard() {
+    this.store.reset();
+    this.showStatus('Board reset (Ctrl+Z to undo)');
+  }
+
+  saveBoard() {
+    try {
+      const data = { entities: this.store.entities(), arrows: this.store.arrows() };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      this.hasSavedBoard.set(true);
+      this.showStatus('Board saved');
+    } catch {
+      this.showStatus('Could not save (storage unavailable)');
+    }
+  }
+
+  loadBoard() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      const isNum = (v: unknown) => typeof v === 'number' && Number.isFinite(v);
+
+      // Only accept positions for entities that exist on the board
+      const saved = new Map<string, { x: number; y: number }>();
+      (Array.isArray(data.entities) ? data.entities : []).forEach((e: any) => {
+        if (typeof e?.id === 'string' && isNum(e.x) && isNum(e.y)) saved.set(e.id, { x: e.x, y: e.y });
+      });
+      const entities = this.store.entities().map(e => ({ ...e, ...(saved.get(e.id) ?? {}) }));
+
+      const arrows = (Array.isArray(data.arrows) ? data.arrows : [])
+        .filter((a: any) => typeof a?.id === 'string' && Array.isArray(a.points) && a.points.length === 4 && a.points.every(isNum));
+
+      this.store.replaceBoard(entities, arrows);
+      this.showStatus('Board loaded');
+    } catch {
+      this.showStatus('Saved board is corrupted');
+    }
+  }
+
+  private showStatus(message: string) {
+    this.statusMessage.set(message);
+    clearTimeout(this.statusTimer);
+    this.statusTimer = setTimeout(() => this.statusMessage.set(''), 2500);
+  }
 
   // Konva Core
   private stage!: Konva.Stage;
   private pitchLayer!: Konva.Layer;
   private drawingLayer!: Konva.Layer;
+  private divisionsLayer!: Konva.Layer;
   private entityLayer!: Konva.Layer;
   private resizeObserver!: ResizeObserver;
 
@@ -87,6 +168,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     this.ngZone.runOutsideAngular(() => {
       this.initCanvas();
       this.drawPitch();
+      this.drawDivisions();
       this.drawPlayers();
       this.setupDrawingEngine();
       this.setupResponsiveObserver();
@@ -108,6 +190,68 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     });
   }
 
+  toggleDivisions() {
+    this.showDivisions.set(!this.showDivisions());
+    this.divisionsLayer.visible(this.showDivisions());
+    this.divisionsLayer.batchDraw();
+  }
+
+  /**
+   * Tactical zones overlay (hidden by default):
+   *  - five vertical channels: wings, half-spaces and the centre (centre = width of the 6-yard box,
+   *    half-spaces fill the rest of the penalty-area width)
+   *  - attacking thirds
+   *  - both penalty areas tinted
+   */
+  private drawDivisions() {
+    const W = this.BASE_WIDTH;
+    const H = this.BASE_HEIGHT;
+    const centreHalf = 183.2 / 2;     // half the 6-yard box width
+    const boxHalf = 403.2 / 2;        // half the penalty-area width
+    const cy = H / 2;
+    const lanes = [
+      0,
+      cy - boxHalf,
+      cy - centreHalf,
+      cy + centreHalf,
+      cy + boxHalf,
+      H,
+    ];
+    const laneNames = ['Left wing', 'Left half-space', 'Centre', 'Right half-space', 'Right wing'];
+    const dashed = { stroke: 'rgba(255, 255, 255, 0.55)', strokeWidth: 2, dash: [10, 8], listening: false };
+    const label = { fontSize: 13, fontFamily: 'sans-serif', fontStyle: 'bold', fill: 'rgba(255, 255, 255, 0.75)', listening: false };
+
+    // Half-space tint (the most valuable channels)
+    [[lanes[1], lanes[2]], [lanes[3], lanes[4]]].forEach(([from, to]) => {
+      this.divisionsLayer.add(new Konva.Rect({ x: 0, y: from, width: W, height: to - from, fill: 'rgba(255, 235, 59, 0.14)', listening: false }));
+    });
+
+    // Penalty areas
+    this.divisionsLayer.add(
+      new Konva.Rect({ x: 0, y: cy - boxHalf, width: 165, height: 403.2, fill: 'rgba(255, 255, 255, 0.10)', listening: false }),
+      new Konva.Rect({ x: W - 165, y: cy - boxHalf, width: 165, height: 403.2, fill: 'rgba(255, 255, 255, 0.10)', listening: false }),
+    );
+
+    // Channel lines
+    lanes.slice(1, -1).forEach(y => {
+      this.divisionsLayer.add(new Konva.Line({ points: [0, y, W, y], ...dashed }));
+    });
+
+    // Thirds
+    [W / 3, (2 * W) / 3].forEach(x => {
+      this.divisionsLayer.add(new Konva.Line({ points: [x, 0, x, H], ...dashed }));
+    });
+    ['Defensive third', 'Middle third', 'Final third'].forEach((name, i) => {
+      this.divisionsLayer.add(new Konva.Text({ text: name, x: (W / 3) * i + 8, y: 8, ...label }));
+    });
+
+    // Channel names, placed just outside the left penalty area so they stay clear of the usual player positions
+    laneNames.forEach((name, i) => {
+      const mid = (lanes[i] + lanes[i + 1]) / 2;
+      this.divisionsLayer.add(new Konva.Text({ text: name, x: 215, y: mid - 7, ...label }));
+    });
+  }
+
   private initCanvas() {
     const container = this.canvasContainer.nativeElement;
     this.stage = new Konva.Stage({
@@ -117,10 +261,12 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     });
 
     this.pitchLayer = new Konva.Layer();
+    this.divisionsLayer = new Konva.Layer({ visible: false, listening: false }); // zones sit just above the pitch
     this.drawingLayer = new Konva.Layer(); // Sits below players, above pitch
     this.entityLayer = new Konva.Layer();
 
     this.stage.add(this.pitchLayer);
+    this.stage.add(this.divisionsLayer);
     this.stage.add(this.drawingLayer);
     this.stage.add(this.entityLayer);
   }
