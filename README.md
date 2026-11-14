@@ -105,7 +105,7 @@ A `ResizeObserver` dynamically scales the Konva stage to fit its container while
 
 ## Tech Stack
 
-- **Angular 19**: Standalone components, Angular Signals, `OnPush` change detection
+- **Angular 22**: Standalone components, Angular Signals, `OnPush` change detection
 - **NgRx Signals (`@ngrx/signals`)**: Single source of truth for timeline frames, entity positions, arrow styles/curves, and per-frame undo/redo stacks
 - **Konva.js**: 2D HTML5 Canvas engine running outside the Angular zone (`NgZone.runOutsideAngular`) for 60fps interaction
 - **FFmpeg.wasm (`@ffmpeg/core`)**: In-browser WebAssembly video encoding (`libx264` + `aac`)
@@ -129,6 +129,38 @@ ng serve
 ```
 
 Then open `http://localhost:4200/` in your browser.
+
+## Development, Testing & Agent Skills
+
+The repository ships project skills in [`.agents/skills/`](.agents/skills) that document how the project is built, tested, analysed and documented, so any contributor (or coding agent) can repeat the workflows.
+
+| Skill | Covers |
+| :--- | :--- |
+| [`tactical-board-dev`](.agents/skills/tactical-board-dev/SKILL.md) | Architecture (store, Konva layers), conventions, adding arrow styles, git rules, definition of done |
+| [`tactical-board-testing`](.agents/skills/tactical-board-testing/SKILL.md) | Type check, vitest, browser verification, regression checklist |
+| [`tactical-board-analysis`](.agents/skills/tactical-board-analysis/SKILL.md) | Reproduce-first debugging, log of past root causes, next-feature analysis |
+| [`readme-media`](.agents/skills/readme-media/SKILL.md) | Screenshots, GIF generation, demo MP4, README gallery |
+| [`mp4-export-compat`](.agents/skills/mp4-export-compat/SKILL.md) | Encode settings that play on Windows 11, `0xc10100be` and 0 B fixes |
+
+### Generating the README media
+
+```bash
+# GIF from an exported MP4 (uses the project's own FFmpeg.wasm, no system ffmpeg needed)
+node .agents/skills/readme-media/scripts/make-gif.js docs/tactical-board-demo.mp4 docs/board-animation.gif 20 840
+
+# Inspect an MP4 (codec, size, SAR, audio) and dump one PNG per second
+node .agents/skills/readme-media/scripts/probe-mp4.js docs/tactical-board-demo.mp4 scratch/frames
+
+# Confirm the MP4 plays in the Windows 11 media stack
+powershell -File .agents/skills/readme-media/scripts/check-windows-playback.ps1 -Path docs\tactical-board-demo.mp4
+```
+
+### Checks before a commit
+
+```bash
+npx tsc --noEmit -p tsconfig.app.json
+npm test
+```
 
 ## Roadmap
 
