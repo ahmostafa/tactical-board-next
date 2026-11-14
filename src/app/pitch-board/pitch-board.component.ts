@@ -96,7 +96,7 @@ const PITCH_PAD_X = 36;
 const PITCH_PAD_Y = 24;
 const FULL_VIEW_W = 1050 + PITCH_PAD_X * 2; // 1122
 const FULL_VIEW_H = 680 + PITCH_PAD_Y * 2; // 728
-const HALF_VIEW_W = PITCH_PAD_X + 525 + 6; // 567 (outer apron + protruding goal net -> halfway line)
+const HALF_VIEW_W = PITCH_PAD_X + 525 + 7; // 568 (even width: outer apron + protruding goal net -> halfway line)
 
 export const BOARD_ZOOM_LEVELS = [0.7, 0.8, 0.9, 1, 1.15, 1.3, 1.5, 1.75, 2];
 
@@ -1865,6 +1865,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     const stepArrows = frames[to].arrows.length > 0 ? frames[to].arrows : frames[from].arrows;
     this.renderArrows(stepArrows);
     this.renderTexts(frames[to].texts ?? [], frames[to].note ?? '');
+    this.renderGoalScoredOverlay(frames[to].entities);
     this.drawingLayer.opacity(frames[to].arrows.length > 0 ? 0 : 1);
 
     const tweens: Konva.Tween[] = [];
@@ -2002,12 +2003,6 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     this.updateDraggable();
     this.showStatus('Loading FFmpeg.wasm...');
 
-    const savedView = this.pitchView();
-    if (savedView !== 'full') {
-      this.pitchView.set('full');
-      this.applyStageViewport();
-    }
-
     const writtenFiles: string[] = [];
     try {
       if (!this.ffmpegCore) {
@@ -2054,6 +2049,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
       this.renderShapes(frames[0].shapes ?? []);
       this.renderArrows(frames[0].arrows, false);
       this.renderTexts(frames[0].texts ?? [], frames[0].note ?? '');
+      this.renderGoalScoredOverlay(frames[0].entities);
       this.drawingLayer.opacity(1);
 
       for (let h = 0; h < holdStart; h++) {
@@ -2101,6 +2097,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
             this.renderTexts(fromFrame.texts ?? [], fromFrame.note ?? '');
             this.drawingLayer.opacity(1);
           }
+          this.renderGoalScoredOverlay(linear >= 0.75 ? toFrame.entities : fromFrame.entities);
 
           capturePng(frameIdx++);
           if (f % 5 === 0) {
@@ -2149,7 +2146,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
           '-i',
           'f_%04d.png',
           '-vf',
-          `fps=${fps},scale=840:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=256:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5`,
+          `fps=${fps},scale=840:-2:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=256:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5`,
           '-loop',
           '0',
           outName,
@@ -2157,7 +2154,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
       } else {
         const durationSec = (frameIdx / fps).toFixed(3);
         const vf =
-          'scale=1280:720:force_original_aspect_ratio=decrease:flags=lanczos,' +
+          'scale=1280:720:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=lanczos,' +
           'pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=#111827,' +
           'setsar=1,format=yuv420p';
 
@@ -2259,10 +2256,6 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
             this.ffmpegCore.FS.unlink(f);
           } catch {}
         }
-      }
-      if (savedView !== 'full') {
-        this.pitchView.set(savedView);
-        this.applyStageViewport();
       }
       this.isExporting.set(false);
       this.updateDraggable();

@@ -4,27 +4,31 @@ A modern, responsive, browser-based football tactical board for match analysis, 
 
 ![Animated tactical sequence with arrows and player movements](docs/board-animation.gif)
 
-> **Exported Video Demo:** [Download / Watch `docs/tactical-board-demo.mp4`](docs/tactical-board-demo.mp4) *(1280×720 HD, 30 fps, H.264 Main Profile + AAC, exported directly from the browser via FFmpeg.wasm)*
+> **Exported HD Video Demos (1280×720, 30 fps, H.264 Main Profile + AAC via FFmpeg.wasm):**
+> - **11v11 Match Tactic:** [Download / Watch `docs/tactical-board-demo.mp4`](docs/tactical-board-demo.mp4) *(High Press & Midfield Trap transition)*
+> - **Empty Pitch 3v2 Drill & Goal Scored (`⚽ GOAL!`):** [Download / Watch `docs/drill-overload-demo.mp4`](docs/drill-overload-demo.mp4) *(Half-pitch overload drill with cones, mannequin, and goal in the net)*
 
 ---
 
 ## Features
 
 ### 1. Squad Modes (11v11, 9v9, 7v7, 5v5, Empty Pitch), Instant Formations & Multi-View Pitch
-- **5 Squad & Drill Modes:** Switch between **`11v11 Full Match`**, **`9v9 Youth / Tactical`**, **`7v7 Small-Sided`**, **`5v5 Futsal / Drill`**, or **`Empty Pitch (Free Build)`** (clears the field so coaches can drag out just 2–3 players, balls, and cones to explain specific drills).
+- **5 Squad & Drill Modes (`Mode:` selector):** Switch between **`11v11 Full Match`**, **`9v9 Youth / Tactical`**, **`7v7 Small-Sided`**, **`5v5 Futsal / Drill`**, or **`Empty Pitch (Free Build)`** (clears the field so coaches can drag out just 2–3 players, balls, and cones to explain specific drills).
 - **7 Built-in 11v11 Formations** for both Home and Away teams (`4-3-3`, `4-2-3-1`, `4-4-2`, `3-5-2`, `3-4-3`, `5-3-2`, `4-1-4-1`) — switch formations at any time while preserving player names, jersey numbers, and vision settings.
 - **Custom Team Colors:** Live color pickers for both Home and Away kits.
 - **4 Pitch Views & Expanded Zoom (`70%` – `200%`):**
   - `Full Horizontal` (standard 105×68 m view with outer stadium apron and protruding woven goal nets)
   - `Half Pitch (Left)` & `Half Pitch (Right)` (framed from outer goal net to the halfway line for set pieces and pressing traps)
-  - `Full Vertical` (coach's touchline / behind-goal perspective with counter-rotated upright player numbers, names, and cones)
-  - **Expanded Zoom (`- / +` & `70%` up to `200%`):** Scale the board from compact `70%` up to `200%` close-up.
+  - `Full Vertical` (coach's touchline / behind-goal perspective with counter-rotated upright player numbers, names, Referee `R`, and cones)
+  - **Expanded Zoom (`- / +` & `70%` up to `200%`):** Scale the board from compact `70%` (`90% (Fit)` default) up to `200%` close-up.
   - Toggleable **Mowed Grass Stripes**, **Pitch Lines (Markings)**, penalty spots, penalty arcs, and **Protruding Woven Goal Nets** (dragging the ball inside either goal net triggers a live **`⚽ GOAL!`** celebration banner).
 - **Interactive 6-Step Feature Tour (`? Tour`) & Built-In Animated Demos (`Demos (3)`):**
   - Step-by-step interactive onboarding tour with one-click **"Try It"** actions.
-  - 3 ready-to-play multi-frame animated coaching presets: **`3v2 Overload Drill & Goal Scored`**, **`High Press & Midfield Trap (11v11)`**, and **`In-Swinging Corner Routine`**.
+  - 3 ready-to-play multi-frame animated coaching presets: **`3v2 Overload Drill & Goal Scored`**, **`High Press & Midfield Trap (11v11)`**, and **`In-Swinging Corner Routine (Set Piece)`**.
 
-![Pro tactical toolbar, training equipment tray, and token inspector](docs/board-pro-features.png)
+![Pro tactical toolbar, player token inspector, vision cones, and ghost trails](docs/board-pro-features.png)
+
+![Interactive 6-step onboarding tour and 3 built-in animated demo tactics](docs/board-tour-demos.png)
 
 ---
 
@@ -51,25 +55,34 @@ Click **Draw Tactical Arrows** or select any drawing tool directly:
 
 ---
 
-### 3. Drag & Drop Bench, Training Equipment Palette & Player Token Inspector
-Expand **`+ Drag Players & Equipment`** (or switch to `Empty Pitch` mode) to drag and drop or click-spawn tokens and training gear directly onto exact pitch coordinates:
+### 3. Empty Pitch Drill Builder, Drag & Drop Palette & Goal Scored Net (`⚽ GOAL!`)
+Expand **`+ Equipment & Bench`** (or switch `Mode:` to **`Empty Pitch (Free Build)`**) to drag and drop or click-spawn tokens and training gear directly onto exact pitch coordinates:
 - **Draggable Bench & Match Tokens:** `+ Home Player`, `+ Home GK`, `+ Away Player`, `+ Away GK`, `+ Referee`, `+ Ball` (multi-ball drills supported)
 - **9 Draggable Vector Training Equipment Items:**
   - `Cone`, `Marker Disc`, `Hurdle`, `Agility Ladder`, `Slalom Pole`, `Mannequin Wall`, `Training Ring`, rotatable `Mini-Goal`, and `Goal Net (Scored!)`
+- **Live Goal Scored Detection (`⚽ GOAL!`):** Dragging the match ball inside the left or right protruding woven goal net highlights the net in gold and renders a **`⚽ GOAL!`** celebration badge during editing, playback, and MP4/GIF export.
 - **Selected Token Inspector Bar:** Click any player or equipment token in Move mode to customize:
   - **Jersey Number** (`1–99`)
   - **Player Name / Role Tag** (rendered in a pill badge beneath the player token)
   - **Directional Vision Cone (`65°` FOV)** + **Facing Angle Slider (`0°–360°`)** to visualize body orientation and scanning angles
   - **Equipment Rotation (`+45°`)** and **Remove from Pitch**
 
+![Empty Pitch Free Build mode with Drag-to-Pitch palette and Goal Scored celebration](docs/board-empty-pitch-drill.png)
+
+![Animated 3v2 Overload Drill & Goal Scored sequence on Half Pitch (Right)](docs/drill-overload-animation.gif)
+
+> **Exported Drill Video:** [Download / Watch `docs/drill-overload-demo.mp4`](docs/drill-overload-demo.mp4) *(Half-pitch 3v2 overload drill ending with a goal inside the protruding woven net)*
+
 ---
 
-### 4. Pitch Divisions & Analytical Zones Overlay
-Toggle **Pitch Divisions** to overlay standard coaching analysis zones above the grass and beneath the players:
+### 4. Full Vertical View & 18-Zone Pitch Divisions Overlay
+- **Full Vertical View (`Pitch: Full Vertical`):** Rotates the stage to a coach's behind-the-goal / touchline perspective while automatically counter-rotating player jersey numbers (`1–11`), Referee `R`, player nameplates, on-pitch text labels, and upright equipment (`Cone`, `Mannequin Wall`, `Hurdle`, `Slalom Pole`, `Goal Net`) so nothing appears sideways.
+- **Pitch Divisions Overlay (`Pitch Divisions`):** Overlays standard coaching analysis zones above the grass and beneath the players:
+  - **Three horizontal thirds:** *Defensive third*, *Middle third*, and *Final third*
+  - **Five vertical channels:** *Left wing*, *Left half-space* (amber tint), *Centre*, *Right half-space* (amber tint), and *Right wing*
+  - **Highlighted penalty areas:** Subtle analytical tint over both 18-yard boxes.
 
-- **Three horizontal thirds:** *Defensive third*, *Middle third*, and *Final third*
-- **Five vertical channels:** *Left wing*, *Left half-space* (amber tint), *Centre*, *Right half-space* (amber tint), and *Right wing*
-- **Highlighted penalty areas:** Subtle analytical tint over both 18-yard boxes.
+![Full Vertical View with upright player numbers, Referee R, cone, and tactical arrows](docs/board-vertical-view.png)
 
 ![Pitch divisions overlay](docs/board-divisions.png)
 
@@ -162,13 +175,14 @@ npm test
 
 ## Roadmap
 
-- [x] Proportional 11v11 pitch, classic football, and boundary-clamped 60fps drag & drop
-- [x] 7 instant 11v11 formations (`4-3-3`, `4-2-3-1`, `4-4-2`, `3-5-2`, `3-4-3`, `5-3-2`, `4-1-4-1`), custom team colors, and 4 pitch views (`Full`, `Half Left`, `Half Right`, `Vertical`)
-- [x] Mowed grass stripes, 3D goal nets, and analytical pitch divisions overlay
-- [x] 6 tactical arrow styles (`Pass`, `Run`, `Dribble`, `Target Zone`, `Block ┬`, `Freehand`), curved Bézier handles, 7 ink colors, and 3 stroke weights
+- [x] Proportional 11v11 pitch, outer stadium apron, protruding woven goal nets, classic football, and boundary-clamped 60fps drag & drop
+- [x] 5 squad & drill modes (`11v11`, `9v9`, `7v7`, `5v5`, `Empty Pitch`), 7 instant 11v11 formations (`4-3-3`, `4-2-3-1`, `4-4-2`, `3-5-2`, `3-4-3`, `5-3-2`, `4-1-4-1`), custom team colors, 4 pitch views (`Full`, `Half Left`, `Half Right`, `Vertical` with upright numbers/cones), and board zoom from `70%` to `200%`
+- [x] Mowed grass stripes, protruding woven goal nets with live `⚽ GOAL!` detection, and 18-zone analytical pitch divisions overlay
+- [x] 6 tactical arrow styles (`Pass`, `Run`, `Dribble`, `Target Zone`, `Block ┬`, `Freehand`), curved Bézier handles, 7 ink colors, 3 stroke weights, and contextual SVG mouse cursors (`Eraser`, `Pencil`, `Crosshair`, `Grab`)
 - [x] Tactical zone shapes (`Rect`, `Circle`, `Triangle`), draggable on-pitch text labels, per-frame coaching notes, and single-click item eraser
-- [x] Training equipment tray (`Cone`, `Marker Disc`, `Hurdle`, `Agility Ladder`, `Slalom Pole`, `Mannequin Wall`, `Training Ring`, `Mini-Goal`, `Referee`, extra players & balls)
+- [x] Drag-and-drop bench & training equipment palette (`Cone`, `Marker Disc`, `Hurdle`, `Agility Ladder`, `Slalom Pole`, `Mannequin Wall`, `Training Ring`, `Mini-Goal`, `Goal Net (Scored!)`, `Referee`, Goalkeepers, extra players & balls)
 - [x] Player token inspector: custom jersey numbers, name/role badges, and directional `65°` vision cones
+- [x] Interactive 6-step onboarding feature tour (`? Tour`) and 3 built-in multi-frame animated demo tactics (`Demos (3)`)
 - [x] Keyframe timeline engine: `Play`, `Play Step`, `Loop`, scrub slider, step duration control, and ghost trails
 - [x] Client-side `2x` PNG, animated GIF, and 720p H.264 MP4 video export with FFmpeg.wasm
 - [x] Collections Library (up to 1,000 schemes), `.json` import/export, and `#scheme=` shareable URLs

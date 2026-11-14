@@ -9,13 +9,18 @@ All media lives in `docs/` and is referenced from `README.md`. Current assets:
 
 | File | What it shows |
 | :--- | :--- |
-| `board-arrows.png` | Pass / Run / Dribble / Target Zone arrows with curve handles |
-| `board-divisions.png` | Pitch divisions overlay |
-| `board-timeline.png` | Timeline, ghost trails, scrub + step sliders |
-| `board-controls.png` | Save / Load / Reset / Undo / Redo bar |
-| `board-export-mp4.png` | 3-frame play with Export MP4 control |
-| `board-animation.gif` | Looping GIF of the animated play (top of README) |
-| `tactical-board-demo.mp4` | 1280x720 H.264 export from the app |
+| `board-pro-features.png` | Full toolbar (`Demos (3)`, `? Tour`, `Mode:`, `70%–200%` zoom), Token Inspector, vision cones, and protruding goal nets |
+| `board-tour-demos.png` | Interactive 6-step onboarding feature tour (`? Tour`) and 3 built-in animated demo tactics (`Demos (3)`) |
+| `board-arrows.png` | Pass / Run / Dribble / Target Zone / Block `┬` arrows, zone shapes, and text annotations |
+| `board-empty-pitch-drill.png` | Empty Pitch (Free Build) mode, Drag-to-Pitch palette, cones/mannequins, and `⚽ GOAL!` celebration in the net |
+| `board-vertical-view.png` | Full Vertical view with upright player numbers (`1–11`), Referee `R`, cone, and tactical arrows |
+| `board-divisions.png` | 18-zone pitch divisions overlay (thirds, half-spaces, channels) |
+| `board-timeline.png` | Timeline bar, ghost trails, scrub + step sliders, `Play Step`, `Loop`, and export buttons |
+| `board-export-mp4.png` | Half-Pitch view with protruding goal net and Export PNG / GIF / MP4 controls |
+| `board-animation.gif` | Looping GIF of the 11v11 High Press & Midfield Trap animation (top of README) |
+| `tactical-board-demo.mp4` | 1280x720 H.264 export of the 11v11 High Press & Midfield Trap play |
+| `drill-overload-animation.gif` | Looping GIF of the Empty Pitch 3v2 Overload Drill & Goal Scored (`⚽ GOAL!`) sequence |
+| `drill-overload-demo.mp4` | 1280x720 H.264 export of the Empty Pitch 3v2 Overload Drill & Goal Scored play |
 
 ## Prerequisites
 - Dev server on `http://localhost:4200/` (`npm start`). Start it with `IsDaemon: true`. A server started in the sandbox is not reachable from the user's browser.
