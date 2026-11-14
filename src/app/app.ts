@@ -6,7 +6,7 @@ import { PitchBoardComponent } from './pitch-board/pitch-board.component';
   standalone: true,
   imports: [PitchBoardComponent],
   template: `
-    <main class="min-h-screen bg-gray-900 flex items-center justify-center pt-10">
+    <main class="min-h-screen bg-gray-900 flex items-start justify-center py-2">
       <app-pitch-board class="w-full"></app-pitch-board>
     </main>
   `

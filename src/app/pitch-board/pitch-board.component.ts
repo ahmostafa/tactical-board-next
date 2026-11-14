@@ -24,7 +24,7 @@ import {
   EquipmentKind,
 } from './board.store';
 import { FORMATION_NAMES, FormationName } from './formations.data';
-import { EQUIPMENT_CATALOG, renderEquipmentShape } from './equipment-renderer';
+import { EQUIPMENT_CATALOG, PITCH_ALIGNED_EQUIPMENT, renderEquipmentShape } from './equipment-renderer';
 import {
   SavedCollectionItem,
   loadCollections,
@@ -61,6 +61,36 @@ export const DRAWING_COLORS = [
   { name: 'Orange', hex: '#fb923c' },
   { name: 'Pink', hex: '#f472b6' },
 ];
+
+/** Builds a CSS cursor value from an inline SVG with a hotspot and a keyword fallback. */
+function svgCursor(svg: string, hotX: number, hotY: number, fallback: string): string {
+  return `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}") ${hotX} ${hotY}, ${fallback}`;
+}
+
+const ERASER_SVG = (body: string) =>
+  `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'>` +
+  `<g transform='rotate(-45 12 12)'>` +
+  `<rect x='4' y='7' width='16' height='10' rx='2' fill='${body}' stroke='#111827' stroke-width='1.5'/>` +
+  `<rect x='4' y='7' width='6' height='10' rx='2' fill='#f9fafb' stroke='#111827' stroke-width='1.5'/>` +
+  `</g></svg>`;
+
+export const CURSORS = {
+  eraser: svgCursor(ERASER_SVG('#f472b6'), 5, 19, 'pointer'),
+  eraserHot: svgCursor(ERASER_SVG('#ef4444'), 5, 19, 'pointer'),
+  pencil: svgCursor(
+    `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'>` +
+      `<path d='M3 21l1.5-5L16 4.5a2.1 2.1 0 013 3L7.5 19z' fill='#facc15' stroke='#111827' stroke-width='1.5' stroke-linejoin='round'/>` +
+      `<path d='M3 21l1.5-5 3 3z' fill='#111827'/></svg>`,
+    3,
+    21,
+    'crosshair'
+  ),
+};
+
+/** Pitch goal mouth (internal 1050x680 coordinates). */
+const GOAL_WIDTH = 73.2;
+const GOAL_TOP = (680 - GOAL_WIDTH) / 2;
+const GOAL_DEPTH = 18;
 
 @Component({
   selector: 'app-pitch-board',
@@ -225,6 +255,17 @@ export const DRAWING_COLORS = [
             <option value="half-left">Half Pitch (Left)</option>
             <option value="half-right">Half Pitch (Right)</option>
             <option value="vertical">Full Vertical</option>
+          </select>
+          <select aria-label="Board zoom"
+                  class="bg-gray-700 text-white rounded px-2 py-1 font-semibold"
+                  title="Board size"
+                  [value]="boardZoom()"
+                  (change)="setBoardZoom(+$any($event.target).value)">
+            <option value="0.8">80%</option>
+            <option value="0.9">90%</option>
+            <option value="1">100%</option>
+            <option value="1.15">115%</option>
+            <option value="1.3">130%</option>
           </select>
           <label class="inline-flex items-center gap-1 cursor-pointer ml-1">
             <input type="checkbox" [checked]="showStripes()" (change)="toggleStripes()" />
@@ -424,10 +465,9 @@ export const DRAWING_COLORS = [
       }
 
       <!-- The Canvas Container -->
-      <div class="bg-[#2e7d32] shadow-2xl overflow-hidden rounded-md touch-none select-none mx-auto transition-all"
-           [class.aspect-\[105\/68\]]="pitchView() !== 'vertical'"
-           [class.aspect-\[68\/105\]]="pitchView() === 'vertical'"
-           [class.max-w-xl]="pitchView() === 'vertical'"
+      <div class="bg-[#2e7d32] shadow-2xl overflow-hidden rounded-md touch-none select-none mx-auto w-full"
+           [style.aspect-ratio]="containerAspect()"
+           [style.max-width]="containerMaxWidth()"
            #canvasContainer></div>
 
       <!-- Timeline & Export Bar -->
@@ -540,6 +580,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
   textSize = signal(18);
 
   pitchView = signal<PitchViewMode>('full');
+  boardZoom = signal(0.9);
   showStripes = signal(true);
   showMarkings = signal(true);
   showDivisions = signal(false);
@@ -547,6 +588,24 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
   loopPlayback = signal(false);
   showEquipmentTray = signal(false);
   showCollections = signal(false);
+
+  /** Counter-rotation applied to upright elements (numbers, names, cones, text) when stage is rotated 90 deg in vertical view. */
+  uprightRotation = computed(() => (this.pitchView() === 'vertical' ? -90 : 0));
+
+  containerAspect = computed(() => {
+    const v = this.pitchView();
+    if (v === 'vertical') return '680 / 1050';
+    if (v === 'half-left' || v === 'half-right') return '580 / 680';
+    return '1050 / 680';
+  });
+
+  containerMaxWidth = computed(() => {
+    const z = this.boardZoom();
+    const v = this.pitchView();
+    if (v === 'vertical') return `min(${Math.round(480 * z)}px, calc((100dvh - 210px) * 0.647 * ${z}))`;
+    if (v === 'half-left' || v === 'half-right') return `min(${Math.round(540 * z)}px, calc((100dvh - 210px) * 0.853 * ${z}))`;
+    return `min(${Math.round(900 * z)}px, calc((100dvh - 210px) * 1.544 * ${z}))`;
+  });
 
   selectedEntityId = signal<string | null>(null);
   selectedEntity = computed(() => {
@@ -595,6 +654,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     this.renderShapes(shapes);
     this.renderArrows(arrows, !this.isPlaying() && !this.isExporting());
     this.renderTexts(texts, note);
+    this.renderGoalScoredOverlay(entities);
     this.drawingLayer.opacity(1);
     this.renderGhost(ghost && current > 0 ? frames[current - 1].entities : null, entities);
     this.scrubPos.set(current);
@@ -609,10 +669,19 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     this.shapesLayer.destroyChildren();
     shapes.forEach((s) => {
       const node = this.createShapeNode(s);
+      node.on('mouseenter', () => {
+        if (this.activeTool() === 'eraser') {
+          this.setStageCursor(CURSORS.eraserHot);
+        }
+      });
+      node.on('mouseleave', () => {
+        this.setStageCursor(this.defaultToolCursor());
+      });
       node.on('click tap', (e) => {
         if (this.activeTool() === 'eraser') {
           e.cancelBubble = true;
           this.ngZone.run(() => this.store.removeShape(s.id));
+          this.setStageCursor(this.defaultToolCursor());
         }
       });
       this.shapesLayer.add(node);
@@ -660,11 +729,21 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
   }
 
   private renderTexts(texts: TacticalText[], frameNote: string) {
-    // Frame coaching note banner at top center of pitch if non-empty
+    const uprightRot = this.uprightRotation();
+    // Frame coaching note banner at top center of visible pitch if non-empty
     if (frameNote.trim()) {
-      const bannerWidth = Math.min(620, Math.max(220, frameNote.length * 9.5 + 36));
-      const bx = (this.BASE_WIDTH - bannerWidth) / 2;
-      const noteGroup = new Konva.Group({ x: bx, y: 12, listening: false });
+      const bannerWidth = Math.min(580, Math.max(220, frameNote.length * 9.2 + 34));
+      const isVert = this.pitchView() === 'vertical';
+      const bx = isVert ? 26 : (this.BASE_WIDTH - bannerWidth) / 2;
+      const by = isVert ? this.BASE_HEIGHT / 2 : 12;
+      const noteGroup = new Konva.Group({
+        x: bx,
+        y: by,
+        rotation: uprightRot,
+        offsetX: isVert ? bannerWidth / 2 : 0,
+        offsetY: isVert ? 14 : 0,
+        listening: false,
+      });
       noteGroup.add(
         new Konva.Rect({
           width: bannerWidth,
@@ -694,8 +773,10 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
       const textGroup = new Konva.Group({
         x: t.x,
         y: t.y,
+        rotation: uprightRot,
         draggable: canDrag,
         listening: canDrag || this.activeTool() === 'eraser',
+        dragBoundFunc: (pos) => this.clampStageDragPos(pos, 16),
       });
       const padX = 8;
       const padY = 4;
@@ -726,18 +807,97 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
         txt
       );
 
+      textGroup.on('mouseenter', () => {
+        if (this.activeTool() === 'eraser') {
+          this.setStageCursor(CURSORS.eraserHot);
+        } else if (canDrag) {
+          this.setStageCursor('grab');
+        }
+      });
+      textGroup.on('mouseleave', () => {
+        this.setStageCursor(this.defaultToolCursor());
+      });
+      textGroup.on('dragstart', () => this.setStageCursor('grabbing'));
       textGroup.on('click tap', (e) => {
         if (this.activeTool() === 'eraser') {
           e.cancelBubble = true;
           this.ngZone.run(() => this.store.removeText(t.id));
+          this.setStageCursor(this.defaultToolCursor());
         }
       });
       textGroup.on('dragend', () => {
+        this.setStageCursor('grab');
         const p = textGroup.position();
         this.ngZone.run(() => this.store.updateTextPosition(t.id, Math.round(p.x), Math.round(p.y)));
       });
       this.drawingLayer.add(textGroup);
     });
+  }
+
+  /** Highlights the left or right goal net and renders a "GOAL!" celebration badge when a ball is inside the goal mouth. */
+  private renderGoalScoredOverlay(entities: TacticalEntity[]) {
+    const balls = entities.filter((e) => e.type === 'ball');
+    const uprightRot = this.uprightRotation();
+    const checkGoal = (side: 'left' | 'right') => {
+      const scored = balls.some((b) =>
+        side === 'left'
+          ? b.x <= GOAL_DEPTH + 6 && b.y >= GOAL_TOP - 4 && b.y <= GOAL_TOP + GOAL_WIDTH + 4
+          : b.x >= this.BASE_WIDTH - GOAL_DEPTH - 6 && b.y >= GOAL_TOP - 4 && b.y <= GOAL_TOP + GOAL_WIDTH + 4
+      );
+      if (!scored) return;
+
+      const gx = side === 'left' ? 0 : this.BASE_WIDTH - GOAL_DEPTH;
+      this.drawingLayer.add(
+        new Konva.Rect({
+          x: gx,
+          y: GOAL_TOP,
+          width: GOAL_DEPTH,
+          height: GOAL_WIDTH,
+          fill: 'rgba(250, 204, 21, 0.38)',
+          stroke: '#facc15',
+          strokeWidth: 3,
+          listening: false,
+        })
+      );
+
+      const badgeX = side === 'left' ? 42 : this.BASE_WIDTH - 42;
+      const badgeY = GOAL_TOP - 18;
+      const badge = new Konva.Group({
+        x: badgeX,
+        y: badgeY,
+        rotation: uprightRot,
+        listening: false,
+      });
+      badge.add(
+        new Konva.Rect({
+          x: -36,
+          y: -12,
+          width: 72,
+          height: 24,
+          cornerRadius: 12,
+          fill: '#f59e0b',
+          stroke: '#111827',
+          strokeWidth: 1.5,
+        }),
+        new Konva.Text({
+          x: -36,
+          y: -12,
+          width: 72,
+          height: 24,
+          text: '⚽ GOAL!',
+          fontSize: 12,
+          fontStyle: 'bold',
+          fontFamily: 'sans-serif',
+          fill: '#111827',
+          align: 'center',
+          verticalAlign: 'middle',
+        })
+      );
+      this.drawingLayer.add(badge);
+    };
+
+    checkGoal('left');
+    checkGoal('right');
   }
 
   private renderArrows(arrows: TacticalArrow[], showHandles = false) {
@@ -746,9 +906,12 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     arrows.forEach((a) => {
       const arrowGroup = this.createArrow(a, isEraser);
       if (isEraser) {
+        arrowGroup.on('mouseenter', () => this.setStageCursor(CURSORS.eraserHot));
+        arrowGroup.on('mouseleave', () => this.setStageCursor(this.defaultToolCursor()));
         arrowGroup.on('click tap', (e) => {
           e.cancelBubble = true;
           this.ngZone.run(() => this.store.removeArrow(a.id));
+          this.setStageCursor(this.defaultToolCursor());
         });
       }
       this.drawingLayer.add(arrowGroup);
@@ -766,25 +929,17 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
           strokeWidth: 2,
           opacity: 0.85,
           draggable: true,
-          dragBoundFunc: (pos) => {
-            const scale = this.stage.scaleX();
-            return {
-              x: Math.max(6 * scale, Math.min(pos.x, (this.BASE_WIDTH - 6) * scale)),
-              y: Math.max(6 * scale, Math.min(pos.y, (this.BASE_HEIGHT - 6) * scale)),
-            };
-          },
+          dragBoundFunc: (pos) => this.clampStageDragPos(pos, 6),
         });
-        handle.on('mouseenter', () => {
-          this.stage.container().style.cursor = 'grab';
-        });
-        handle.on('mouseleave', () => {
-          this.stage.container().style.cursor = this.isDrawingMode() ? 'crosshair' : 'default';
-        });
+        handle.on('mouseenter', () => this.setStageCursor('grab'));
+        handle.on('mouseleave', () => this.setStageCursor(this.defaultToolCursor()));
+        handle.on('dragstart', () => this.setStageCursor('grabbing'));
         handle.on('dragmove', () => {
           const p = handle.position();
           this.updateArrowGroup(arrowGroup, a.points, a.style ?? 'pass', [p.x, p.y]);
         });
         handle.on('dragend', () => {
+          this.setStageCursor('grab');
           const p = handle.position();
           this.ngZone.run(() =>
             this.store.updateArrowControl(a.id, [Math.round(p.x), Math.round(p.y)])
@@ -1100,6 +1255,15 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
 
   setPitchView(view: PitchViewMode) {
     this.pitchView.set(view);
+    setTimeout(() => {
+      this.applyStageViewport();
+      this.drawDivisions();
+      this.syncFromStore();
+    }, 0);
+  }
+
+  setBoardZoom(zoom: number) {
+    this.boardZoom.set(zoom);
     setTimeout(() => this.applyStageViewport(), 0);
   }
 
@@ -1371,6 +1535,21 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     tweens.forEach((t) => t.play());
   }
 
+  private defaultToolCursor(): string {
+    if (this.isPlaying() || this.isExporting()) return 'default';
+    const tool = this.activeTool();
+    if (tool === 'eraser') return CURSORS.eraser;
+    if (tool === 'arrow') return this.arrowStyle() === 'freehand' ? CURSORS.pencil : 'crosshair';
+    if (tool === 'shape') return 'crosshair';
+    if (tool === 'text') return 'text';
+    return 'default';
+  }
+
+  private setStageCursor(cursor: string) {
+    if (!this.stage) return;
+    this.stage.container().style.cursor = cursor;
+  }
+
   private updateDraggable() {
     const isMove = this.activeTool() === 'move' && !this.isPlaying() && !this.isExporting();
     const isEraser = this.activeTool() === 'eraser' && !this.isPlaying() && !this.isExporting();
@@ -1378,14 +1557,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
       this.entityLayer.listening(isMove || isEraser);
       this.entityLayer.getChildren().forEach((group) => group.draggable(isMove));
     }
-    if (this.stage) {
-      this.stage.container().style.cursor =
-        this.activeTool() === 'eraser'
-          ? 'pointer'
-          : this.isDrawingMode()
-            ? 'crosshair'
-            : 'default';
-    }
+    this.setStageCursor(this.defaultToolCursor());
   }
 
   toggleDrawingMode() {
@@ -1857,8 +2029,11 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
   }
 
   private drawDivisions() {
+    if (!this.divisionsLayer) return;
+    this.divisionsLayer.destroyChildren();
     const W = this.BASE_WIDTH;
     const H = this.BASE_HEIGHT;
+    const uprightRot = this.uprightRotation();
     const centreHalf = 183.2 / 2;
     const boxHalf = 403.2 / 2;
     const cy = H / 2;
@@ -1875,6 +2050,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
       fontFamily: 'sans-serif',
       fontStyle: 'bold',
       fill: 'rgba(255, 255, 255, 0.75)',
+      rotation: uprightRot,
       listening: false,
     };
 
@@ -1921,13 +2097,21 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
       this.divisionsLayer.add(new Konva.Line({ points: [x, 0, x, H], ...dashed }));
     });
     ['Defensive third', 'Middle third', 'Final third'].forEach((name, i) => {
-      this.divisionsLayer.add(new Konva.Text({ text: name, x: (W / 3) * i + 8, y: 8, ...label }));
+      this.divisionsLayer.add(
+        new Konva.Text({
+          text: name,
+          x: (W / 3) * i + 24,
+          y: uprightRot === 0 ? 8 : 120,
+          ...label,
+        })
+      );
     });
 
     laneNames.forEach((name, i) => {
       const mid = (lanes[i] + lanes[i + 1]) / 2;
       this.divisionsLayer.add(new Konva.Text({ text: name, x: 215, y: mid - 7, ...label }));
     });
+    this.divisionsLayer.batchDraw();
   }
 
   private initCanvas() {
@@ -1977,22 +2161,24 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
       this.stage.y(0);
       this.stage.scale({ x: scale, y: scale });
     } else if (view === 'half-left') {
+      // Full half-pitch (580x680 including center circle) fitted cleanly from top touchline to bottom touchline
       const scale = cw / 580;
-      const ch = (cw * 68) / 105;
+      const ch = this.BASE_HEIGHT * scale;
       this.stage.width(cw);
       this.stage.height(ch);
       this.stage.rotation(0);
       this.stage.x(0);
-      this.stage.y((ch - this.BASE_HEIGHT * scale) / 2);
+      this.stage.y(0);
       this.stage.scale({ x: scale, y: scale });
     } else if (view === 'half-right') {
+      // Right half-pitch (x: 470..1050, y: 0..680) fitted cleanly from top touchline to bottom touchline
       const scale = cw / 580;
-      const ch = (cw * 68) / 105;
+      const ch = this.BASE_HEIGHT * scale;
       this.stage.width(cw);
       this.stage.height(ch);
       this.stage.rotation(0);
       this.stage.x(-470 * scale);
-      this.stage.y((ch - this.BASE_HEIGHT * scale) / 2);
+      this.stage.y(0);
       this.stage.scale({ x: scale, y: scale });
     } else {
       const scale = cw / this.BASE_WIDTH;
@@ -2004,6 +2190,18 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
       this.stage.scale({ x: scale, y: scale });
     }
     this.stage.batchDraw();
+  }
+
+  /** Clamps a Konva dragBoundFunc screen position into internal [margin, 1050-margin] x [margin, 680-margin] across all views. */
+  private clampStageDragPos(pos: { x: number; y: number }, margin: number): { x: number; y: number } {
+    const absTransform = this.stage.getAbsoluteTransform();
+    const inv = absTransform.copy().invert();
+    const internal = inv.point(pos);
+    const clamped = {
+      x: Math.max(margin, Math.min(this.BASE_WIDTH - margin, internal.x)),
+      y: Math.max(margin, Math.min(this.BASE_HEIGHT - margin, internal.y)),
+    };
+    return absTransform.point(clamped);
   }
 
   /** Converts pointer position on stage to internal 1050x680 pitch coordinates regardless of view/rotation. */
@@ -2272,29 +2470,54 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
       ...lineConfig,
     });
 
-    // 3D Goal Nets along both goal lines
-    const goalH = 73.2;
-    const goalY = (H - goalH) / 2;
-    const leftNet = new Konva.Rect({
-      x: 0,
-      y: goalY,
-      width: 14,
-      height: goalH,
-      fill: 'rgba(255, 255, 255, 0.14)',
-      stroke: 'rgba(255, 255, 255, 0.9)',
-      strokeWidth: 2,
-      listening: false,
-    });
-    const rightNet = new Konva.Rect({
-      x: W - 14,
-      y: goalY,
-      width: 14,
-      height: goalH,
-      fill: 'rgba(255, 255, 255, 0.14)',
-      stroke: 'rgba(255, 255, 255, 0.9)',
-      strokeWidth: 2,
-      listening: false,
-    });
+    // Woven 3D Goal Nets along both goal lines
+    const buildGoalNet = (gx: number, isLeft: boolean): Konva.Group => {
+      const netGroup = new Konva.Group({ listening: false });
+      const nw = GOAL_DEPTH;
+      const nh = GOAL_WIDTH;
+      const ny = GOAL_TOP;
+      netGroup.add(
+        new Konva.Rect({
+          x: gx,
+          y: ny,
+          width: nw,
+          height: nh,
+          fill: 'rgba(255, 255, 255, 0.16)',
+          stroke: 'rgba(255, 255, 255, 0.92)',
+          strokeWidth: 2.2,
+        })
+      );
+      // Horizontal mesh threads
+      for (let y = ny + 8; y < ny + nh; y += 8) {
+        netGroup.add(
+          new Konva.Line({
+            points: [gx, y, gx + nw, y],
+            stroke: 'rgba(255, 255, 255, 0.38)',
+            strokeWidth: 1,
+          })
+        );
+      }
+      // Vertical mesh threads
+      for (let x = gx + 5; x < gx + nw; x += 5) {
+        netGroup.add(
+          new Konva.Line({
+            points: [x, ny, x, ny + nh],
+            stroke: 'rgba(255, 255, 255, 0.38)',
+            strokeWidth: 1,
+          })
+        );
+      }
+      // Goalpost circles on the goal line
+      const postX = isLeft ? gx : gx + nw;
+      netGroup.add(
+        new Konva.Circle({ x: postX, y: ny, radius: 3.5, fill: '#ffffff', stroke: '#111827', strokeWidth: 1 }),
+        new Konva.Circle({ x: postX, y: ny + nh, radius: 3.5, fill: '#ffffff', stroke: '#111827', strokeWidth: 1 })
+      );
+      return netGroup;
+    };
+
+    const leftNet = buildGoalNet(0, true);
+    const rightNet = buildGoalNet(W - GOAL_DEPTH, false);
 
     this.pitchLayer.add(
       boundary,
@@ -2382,6 +2605,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
 
     const isMove = this.activeTool() === 'move' && !this.isPlaying() && !this.isExporting();
     const isEraser = this.activeTool() === 'eraser' && !this.isPlaying() && !this.isExporting();
+    const uprightRot = this.uprightRotation();
     this.entityLayer.listening(isMove || isEraser);
 
     entities.forEach((entity) => {
@@ -2396,20 +2620,27 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
           x: entity.x,
           y: entity.y,
           draggable: isMove,
-          dragBoundFunc: (pos) => {
-            const scale = this.stage.scaleX();
-            const minX = radius * scale;
-            const maxX = this.BASE_WIDTH * scale - radius * scale;
-            const minY = radius * scale;
-            const maxY = this.BASE_HEIGHT * scale - radius * scale;
-            return {
-              x: Math.max(minX, Math.min(pos.x, maxX)),
-              y: Math.max(minY, Math.min(pos.y, maxY)),
-            };
-          },
+          dragBoundFunc: (pos) => this.clampStageDragPos(pos, radius),
+        });
+
+        group.on('mouseenter', () => {
+          if (this.activeTool() === 'eraser' && entity.id !== 'ball') {
+            this.setStageCursor(CURSORS.eraserHot);
+          } else if (this.activeTool() === 'move' && !this.isPlaying() && !this.isExporting()) {
+            this.setStageCursor('grab');
+          }
+        });
+
+        group.on('mouseleave', () => {
+          this.setStageCursor(this.defaultToolCursor());
+        });
+
+        group.on('dragstart', () => {
+          this.setStageCursor('grabbing');
         });
 
         group.on('dragend', () => {
+          this.setStageCursor('grab');
           const newPos = group!.position();
           this.ngZone.run(() => {
             this.store.updatePosition(entity.id, Math.round(newPos.x), Math.round(newPos.y));
@@ -2422,6 +2653,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
             if (entity.id !== 'ball') {
               e.cancelBubble = true;
               this.ngZone.run(() => this.store.removeEntity(entity.id));
+              this.setStageCursor(this.defaultToolCursor());
             }
             return;
           }
@@ -2435,7 +2667,12 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
       }
 
       group.position({ x: entity.x, y: entity.y });
-      group.rotation(isEquip ? entity.rotation ?? 0 : 0);
+      if (isEquip) {
+        const isPitchAligned = entity.equipmentKind && PITCH_ALIGNED_EQUIPMENT.has(entity.equipmentKind);
+        group.rotation((isPitchAligned ? 0 : uprightRot) + (entity.rotation ?? 0));
+      } else {
+        group.rotation(0);
+      }
       group.draggable(isMove);
       group.destroyChildren();
 
@@ -2452,7 +2689,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
         );
       }
 
-      // Vision cone / orientation indicator for players
+      // Vision cone / orientation indicator for players (remains aligned with pitch facing angle)
       if (!isBall && !isEquip && entity.showVision) {
         const facing = entity.facing ?? (entity.type === 'away' ? 180 : 0);
         group.add(
@@ -2490,54 +2727,63 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
         );
       }
 
-      if (!isBall && !isEquip && entity.label) {
-        group.add(
-          new Konva.Text({
-            text: entity.label,
-            fontSize: 13,
-            fontFamily: 'sans-serif',
-            fill: entity.type === 'referee' ? '#111827' : '#ffffff',
-            fontStyle: 'bold',
-            width: radius * 2,
-            height: radius * 2,
-            offsetX: radius,
-            offsetY: radius,
-            align: 'center',
-            verticalAlign: 'middle',
-            listening: false,
-          })
-        );
-      }
+      // Upright sub-group for player jersey number, referee 'R', and player name badge so they never appear sideways in Vertical view
+      if (!isBall && !isEquip && (entity.label || entity.name?.trim())) {
+        const uprightGroup = new Konva.Group({
+          rotation: uprightRot,
+          listening: false,
+        });
 
-      // Player Name / Role tag rendered beneath the token
-      if (!isBall && !isEquip && entity.name?.trim()) {
-        const nameStr = entity.name.trim();
-        const tagW = Math.max(38, nameStr.length * 6.8 + 10);
-        group.add(
-          new Konva.Rect({
-            x: -tagW / 2,
-            y: radius + 3,
-            width: tagW,
-            height: 15,
-            fill: 'rgba(17, 24, 39, 0.85)',
-            cornerRadius: 3,
-            listening: false,
-          }),
-          new Konva.Text({
-            x: -tagW / 2,
-            y: radius + 3,
-            width: tagW,
-            height: 15,
-            text: nameStr,
-            fontSize: 10,
-            fontFamily: 'sans-serif',
-            fontStyle: 'bold',
-            fill: '#f9fafb',
-            align: 'center',
-            verticalAlign: 'middle',
-            listening: false,
-          })
-        );
+        if (entity.label) {
+          uprightGroup.add(
+            new Konva.Text({
+              text: entity.label,
+              fontSize: 13,
+              fontFamily: 'sans-serif',
+              fill: entity.type === 'referee' ? '#111827' : '#ffffff',
+              fontStyle: 'bold',
+              width: radius * 2,
+              height: radius * 2,
+              offsetX: radius,
+              offsetY: radius,
+              align: 'center',
+              verticalAlign: 'middle',
+              listening: false,
+            })
+          );
+        }
+
+        if (entity.name?.trim()) {
+          const nameStr = entity.name.trim();
+          const tagW = Math.max(38, nameStr.length * 6.8 + 10);
+          uprightGroup.add(
+            new Konva.Rect({
+              x: -tagW / 2,
+              y: radius + 3,
+              width: tagW,
+              height: 15,
+              fill: 'rgba(17, 24, 39, 0.85)',
+              cornerRadius: 3,
+              listening: false,
+            }),
+            new Konva.Text({
+              x: -tagW / 2,
+              y: radius + 3,
+              width: tagW,
+              height: 15,
+              text: nameStr,
+              fontSize: 10,
+              fontFamily: 'sans-serif',
+              fontStyle: 'bold',
+              fill: '#f9fafb',
+              align: 'center',
+              verticalAlign: 'middle',
+              listening: false,
+            })
+          );
+        }
+
+        group.add(uprightGroup);
       }
     });
   }

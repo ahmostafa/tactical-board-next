@@ -11,7 +11,8 @@ export type EquipmentKind =
   | 'pole'
   | 'mannequin'
   | 'ring'
-  | 'minigoal';
+  | 'minigoal'
+  | 'goalnet';
 
 export interface TacticalEntity {
   id: string;

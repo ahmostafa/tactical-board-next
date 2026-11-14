@@ -16,7 +16,14 @@ export const EQUIPMENT_CATALOG: EquipmentCatalogItem[] = [
   { kind: 'mannequin', label: 'Mannequin Wall', defaultColor: '#f59e0b' },
   { kind: 'ring', label: 'Training Ring', defaultColor: '#38bdf8' },
   { kind: 'minigoal', label: 'Mini-Goal', defaultColor: '#ffffff' },
+  { kind: 'goalnet', label: 'Goal Net (Scored!)', defaultColor: '#ffffff' },
 ];
+
+/**
+ * Equipment whose orientation is tied to the pitch (they lie flat on the grass and can be rotated).
+ * Everything else is drawn "standing up" and is kept upright on screen in every pitch view.
+ */
+export const PITCH_ALIGNED_EQUIPMENT: ReadonlySet<EquipmentKind> = new Set<EquipmentKind>(['ladder', 'minigoal']);
 
 export function renderEquipmentShape(group: Konva.Group, kind: EquipmentKind, color = '#f97316') {
   switch (kind) {
@@ -170,6 +177,63 @@ export function renderEquipmentShape(group: Konva.Group, kind: EquipmentKind, co
           })
         );
       }
+      break;
+    }
+    case 'goalnet': {
+      // Front view of a goal with the ball resting in the bulging net and a "GOAL!" badge
+      const gw = 64;
+      const gh = 34;
+      const top = -gh / 2 + 4;
+      const left = -gw / 2;
+      group.add(
+        new Konva.Rect({ x: left, y: top, width: gw, height: gh, fill: 'rgba(255, 255, 255, 0.12)' })
+      );
+      for (let x = left + 6; x < gw / 2; x += 6) {
+        group.add(
+          new Konva.Line({
+            points: [x, top, x + (x < 0 ? -2 : 2), top + gh],
+            stroke: 'rgba(255,255,255,0.45)',
+            strokeWidth: 1,
+            listening: false,
+          })
+        );
+      }
+      for (let y = top + 6; y < top + gh; y += 6) {
+        group.add(
+          new Konva.Line({
+            points: [left, y, gw / 2, y],
+            stroke: 'rgba(255,255,255,0.45)',
+            strokeWidth: 1,
+            listening: false,
+          })
+        );
+      }
+      group.add(
+        new Konva.Line({
+          points: [left, top + gh, left, top, gw / 2, top, gw / 2, top + gh],
+          stroke: color,
+          strokeWidth: 4,
+          lineCap: 'round',
+          lineJoin: 'round',
+        }),
+        new Konva.Circle({ x: gw / 2 - 14, y: top + gh - 9, radius: 7, fill: '#ffffff', stroke: '#111827', strokeWidth: 1.2 }),
+        new Konva.RegularPolygon({ x: gw / 2 - 14, y: top + gh - 9, sides: 5, radius: 2.8, fill: '#111827' }),
+        new Konva.Rect({ x: -24, y: top - 19, width: 48, height: 16, cornerRadius: 8, fill: '#f59e0b', stroke: '#111827', strokeWidth: 1 }),
+        new Konva.Text({
+          x: -24,
+          y: top - 19,
+          width: 48,
+          height: 16,
+          text: 'GOAL!',
+          fontSize: 11,
+          fontStyle: 'bold',
+          fontFamily: 'sans-serif',
+          fill: '#111827',
+          align: 'center',
+          verticalAlign: 'middle',
+          listening: false,
+        })
+      );
       break;
     }
   }
