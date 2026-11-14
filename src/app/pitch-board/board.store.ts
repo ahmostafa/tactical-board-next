@@ -1,6 +1,6 @@
 import { computed } from '@angular/core';
 import { patchState, signalStore, withComputed, withMethods, withState } from '@ngrx/signals';
-import { FormationName, getFormationEntities } from './formations.data';
+import { FormationName, getFormationEntities, getSquadPresetEntities, SquadPreset } from './formations.data';
 
 export type EquipmentKind =
   | 'cone'
@@ -85,6 +85,7 @@ const initialState = {
   note: '',
   homeFormation: '4-3-3' as FormationName,
   awayFormation: '4-2-3-1' as FormationName,
+  squadPreset: '11v11' as SquadPreset,
   homeColor: '#e74c3c',
   awayColor: '#3498db',
   frames: [
@@ -161,39 +162,34 @@ const isEntityType = (v: unknown): v is TacticalEntity['type'] =>
 
 /** Rebuilds a frame from untrusted data, keeping known players, custom tokens/equipment, arrows, shapes and texts. */
 const sanitizeFrame = (raw: any): Snapshot => {
-  const rawEntities = Array.isArray(raw?.entities) ? raw.entities : [];
-  const savedById = new Map<string, any>();
-  const extraEntities: TacticalEntity[] = [];
-  const defaultIds = new Set(INITIAL_ENTITIES.map((e) => e.id));
-
-  rawEntities.forEach((e: any) => {
-    if (typeof e?.id !== 'string' || !isNum(e.x) || !isNum(e.y)) return;
-    const meta: Partial<TacticalEntity> = {
-      x: e.x,
-      y: e.y,
-      ...(typeof e.label === 'string' ? { label: e.label.slice(0, 4) } : {}),
-      ...(typeof e.name === 'string' ? { name: e.name.slice(0, 24) } : {}),
-      ...(typeof e.color === 'string' ? { color: e.color } : {}),
-      ...(isNum(e.facing) ? { facing: e.facing } : {}),
-      ...(typeof e.showVision === 'boolean' ? { showVision: e.showVision } : {}),
-      ...(typeof e.equipmentKind === 'string' ? { equipmentKind: e.equipmentKind as EquipmentKind } : {}),
-      ...(isNum(e.rotation) ? { rotation: e.rotation } : {}),
-    };
-    if (defaultIds.has(e.id)) {
-      savedById.set(e.id, meta);
-    } else if (isEntityType(e.type)) {
-      extraEntities.push({ id: e.id, type: e.type, x: e.x, y: e.y, ...meta });
-    }
-  });
-
-  // If the save explicitly removed some default players (e.g. small-sided drill), respect rawEntities when non-empty
-  const baseEntities =
-    rawEntities.length > 0 && raw?.allowPartialSquad
-      ? INITIAL_ENTITIES.filter((e) => savedById.has(e.id)).map((e) => ({ ...e, ...savedById.get(e.id) }))
-      : INITIAL_ENTITIES.map((e) => ({ ...e, ...(savedById.get(e.id) ?? {}) }));
+  const defaultById = new Map(INITIAL_ENTITIES.map((e) => [e.id, e]));
+  const entities: TacticalEntity[] = Array.isArray(raw?.entities)
+    ? raw.entities
+        .map((e: any): TacticalEntity | null => {
+          if (typeof e?.id !== 'string' || !isNum(e.x) || !isNum(e.y)) return null;
+          const fallback = defaultById.get(e.id);
+          const type = isEntityType(e.type) ? e.type : fallback?.type;
+          if (!type) return null;
+          return {
+            ...(fallback ?? {}),
+            id: e.id,
+            type,
+            x: e.x,
+            y: e.y,
+            ...(typeof e.label === 'string' ? { label: e.label.slice(0, 4) } : {}),
+            ...(typeof e.name === 'string' ? { name: e.name.slice(0, 24) } : {}),
+            ...(typeof e.color === 'string' ? { color: e.color } : {}),
+            ...(isNum(e.facing) ? { facing: e.facing } : {}),
+            ...(typeof e.showVision === 'boolean' ? { showVision: e.showVision } : {}),
+            ...(typeof e.equipmentKind === 'string' ? { equipmentKind: e.equipmentKind as EquipmentKind } : {}),
+            ...(isNum(e.rotation) ? { rotation: e.rotation } : {}),
+          };
+        })
+        .filter((e: TacticalEntity | null): e is TacticalEntity => e !== null)
+    : INITIAL_ENTITIES;
 
   return {
-    entities: [...baseEntities, ...extraEntities],
+    entities,
     arrows: (Array.isArray(raw?.arrows) ? raw.arrows : [])
       .filter((a: any) => typeof a?.id === 'string' && Array.isArray(a.points) && a.points.length === 4 && a.points.every(isNum))
       .map((a: any): TacticalArrow => ({
@@ -276,6 +272,31 @@ export const BoardStore = signalStore(
     },
     setTeamColor(team: 'home' | 'away', color: string) {
       patchState(store, team === 'home' ? { homeColor: color } : { awayColor: color });
+    },
+    applySquadPreset(preset: SquadPreset) {
+      patchState(store, (state) => {
+        const nextEntities = getSquadPresetEntities(preset, state.homeFormation, state.awayFormation);
+        return {
+          squadPreset: preset,
+          ...withHistory(state, {
+            entities: nextEntities,
+          }),
+        };
+      });
+    },
+    clearEntities(keepBall = false) {
+      patchState(store, (state) => {
+        const existingBall = state.entities.find((e) => e.type === 'ball');
+        const nextEntities: TacticalEntity[] = keepBall
+          ? [existingBall ?? { id: 'ball', type: 'ball', x: 525, y: 340 }]
+          : [];
+        return {
+          squadPreset: 'empty' as SquadPreset,
+          ...withHistory(state, {
+            entities: nextEntities,
+          }),
+        };
+      });
     },
     applyFormation(team: 'home' | 'away', formation: FormationName) {
       const fresh = getFormationEntities(team, formation);
@@ -387,6 +408,7 @@ export const BoardStore = signalStore(
     /** Restores the starting formation and removes all drawings of the current frame (undoable). */
     reset() {
       patchState(store, (state) => ({
+        squadPreset: '11v11' as SquadPreset,
         homeFormation: '4-3-3' as FormationName,
         awayFormation: '4-2-3-1' as FormationName,
         ...withHistory(state, {
@@ -479,6 +501,7 @@ export const BoardStore = signalStore(
     exportBoard() {
       return {
         version: 3,
+        squadPreset: store.squadPreset(),
         homeFormation: store.homeFormation(),
         awayFormation: store.awayFormation(),
         homeColor: store.homeColor(),
@@ -499,6 +522,7 @@ export const BoardStore = signalStore(
       patchState(store, (state) => ({
         ...showFrame(frames, index),
         stepDurationMs: isNum(data.stepDurationMs) ? clampStep(data.stepDurationMs) : state.stepDurationMs,
+        ...(typeof data.squadPreset === 'string' ? { squadPreset: data.squadPreset as SquadPreset } : {}),
         ...(typeof data.homeColor === 'string' ? { homeColor: data.homeColor } : {}),
         ...(typeof data.awayColor === 'string' ? { awayColor: data.awayColor } : {}),
       }));

@@ -10,14 +10,19 @@ A modern, responsive, browser-based football tactical board for match analysis, 
 
 ## Features
 
-### 1. Instant Formations, Team Customizer & Multi-View Pitch
+### 1. Squad Modes (11v11, 9v9, 7v7, 5v5, Empty Pitch), Instant Formations & Multi-View Pitch
+- **5 Squad & Drill Modes:** Switch between **`11v11 Full Match`**, **`9v9 Youth / Tactical`**, **`7v7 Small-Sided`**, **`5v5 Futsal / Drill`**, or **`Empty Pitch (Free Build)`** (clears the field so coaches can drag out just 2–3 players, balls, and cones to explain specific drills).
 - **7 Built-in 11v11 Formations** for both Home and Away teams (`4-3-3`, `4-2-3-1`, `4-4-2`, `3-5-2`, `3-4-3`, `5-3-2`, `4-1-4-1`) — switch formations at any time while preserving player names, jersey numbers, and vision settings.
 - **Custom Team Colors:** Live color pickers for both Home and Away kits.
-- **4 Pitch Views & Toggles:**
-  - `Full Horizontal` (standard 105×68 m view)
-  - `Half Pitch (Left)` & `Half Pitch (Right)` (zoomed set-piece and pressing-trap views)
-  - `Full Vertical` (coach's touchline / behind-goal perspective)
-  - Toggleable **Mowed Grass Stripes**, **Pitch Lines (Markings)**, penalty spots, penalty arcs, and **3D Goal Nets**.
+- **4 Pitch Views & Expanded Zoom (`70%` – `200%`):**
+  - `Full Horizontal` (standard 105×68 m view with outer stadium apron and protruding woven goal nets)
+  - `Half Pitch (Left)` & `Half Pitch (Right)` (framed from outer goal net to the halfway line for set pieces and pressing traps)
+  - `Full Vertical` (coach's touchline / behind-goal perspective with counter-rotated upright player numbers, names, and cones)
+  - **Expanded Zoom (`- / +` & `70%` up to `200%`):** Scale the board from compact `70%` up to `200%` close-up.
+  - Toggleable **Mowed Grass Stripes**, **Pitch Lines (Markings)**, penalty spots, penalty arcs, and **Protruding Woven Goal Nets** (dragging the ball inside either goal net triggers a live **`⚽ GOAL!`** celebration banner).
+- **Interactive 6-Step Feature Tour (`? Tour`) & Built-In Animated Demos (`Demos (3)`):**
+  - Step-by-step interactive onboarding tour with one-click **"Try It"** actions.
+  - 3 ready-to-play multi-frame animated coaching presets: **`3v2 Overload Drill & Goal Scored`**, **`High Press & Midfield Trap (11v11)`**, and **`In-Swinging Corner Routine`**.
 
 ![Pro tactical toolbar, training equipment tray, and token inspector](docs/board-pro-features.png)
 
@@ -46,11 +51,11 @@ Click **Draw Tactical Arrows** or select any drawing tool directly:
 
 ---
 
-### 3. Training Equipment Tray & Player Token Inspector
-Expand **`+ Equipment & Bench`** to spawn extra tokens and training gear directly onto the pitch:
-- **Bench & Match Tokens:** `+ Home Player`, `+ Away Player`, `+ Referee`, `+ Ball` (multi-ball drills supported)
-- **8 Vector Training Equipment Items:**
-  - `Cone`, `Marker Disc`, `Hurdle`, `Agility Ladder`, `Slalom Pole`, `Mannequin Wall`, `Training Ring`, and rotatable `Mini-Goal`
+### 3. Drag & Drop Bench, Training Equipment Palette & Player Token Inspector
+Expand **`+ Drag Players & Equipment`** (or switch to `Empty Pitch` mode) to drag and drop or click-spawn tokens and training gear directly onto exact pitch coordinates:
+- **Draggable Bench & Match Tokens:** `+ Home Player`, `+ Home GK`, `+ Away Player`, `+ Away GK`, `+ Referee`, `+ Ball` (multi-ball drills supported)
+- **9 Draggable Vector Training Equipment Items:**
+  - `Cone`, `Marker Disc`, `Hurdle`, `Agility Ladder`, `Slalom Pole`, `Mannequin Wall`, `Training Ring`, rotatable `Mini-Goal`, and `Goal Net (Scored!)`
 - **Selected Token Inspector Bar:** Click any player or equipment token in Move mode to customize:
   - **Jersey Number** (`1–99`)
   - **Player Name / Role Tag** (rendered in a pill badge beneath the player token)

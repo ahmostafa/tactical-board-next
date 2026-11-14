@@ -123,6 +123,46 @@ const HOME_FORMATIONS: Record<FormationName, Pos[]> = {
   ],
 };
 
+export type SquadPreset = '11v11' | '9v9' | '7v7' | '5v5' | 'empty';
+
+export const SQUAD_PRESET_OPTIONS: { value: SquadPreset; label: string }[] = [
+  { value: '11v11', label: '11v11 Full Match' },
+  { value: '9v9', label: '9v9 Youth / Tactical' },
+  { value: '7v7', label: '7v7 Small-Sided' },
+  { value: '5v5', label: '5v5 Futsal / Drill' },
+  { value: 'empty', label: 'Empty Pitch (Free Build)' },
+];
+
+const SMALL_SIDED_HOME: Record<'9v9' | '7v7' | '5v5', Pos[]> = {
+  '9v9': [
+    { label: '1', x: 50, y: 340 },
+    { label: '2', x: 195, y: 510 },
+    { label: '4', x: 180, y: 340 },
+    { label: '3', x: 195, y: 170 },
+    { label: '7', x: 350, y: 520 },
+    { label: '6', x: 330, y: 340 },
+    { label: '8', x: 350, y: 160 },
+    { label: '10', x: 440, y: 400 },
+    { label: '9', x: 485, y: 280 },
+  ],
+  '7v7': [
+    { label: '1', x: 50, y: 340 },
+    { label: '2', x: 195, y: 460 },
+    { label: '3', x: 195, y: 220 },
+    { label: '6', x: 340, y: 340 },
+    { label: '7', x: 390, y: 500 },
+    { label: '11', x: 390, y: 180 },
+    { label: '9', x: 490, y: 340 },
+  ],
+  '5v5': [
+    { label: '1', x: 55, y: 340 },
+    { label: '4', x: 210, y: 340 },
+    { label: '7', x: 360, y: 480 },
+    { label: '11', x: 360, y: 200 },
+    { label: '9', x: 485, y: 340 },
+  ],
+};
+
 export function getFormationEntities(team: 'home' | 'away', formation: FormationName): TacticalEntity[] {
   const layout = HOME_FORMATIONS[formation] ?? HOME_FORMATIONS['4-3-3'];
   const prefix = team === 'home' ? 'h' : 'a';
@@ -133,4 +173,37 @@ export function getFormationEntities(team: 'home' | 'away', formation: Formation
     y: team === 'home' ? p.y : 680 - p.y,
     label: p.label,
   }));
+}
+
+export function getSquadPresetEntities(
+  preset: SquadPreset,
+  homeFormation: FormationName = '4-3-3',
+  awayFormation: FormationName = '4-3-3'
+): TacticalEntity[] {
+  if (preset === 'empty') {
+    return [];
+  }
+  if (preset === '11v11') {
+    return [
+      ...getFormationEntities('home', homeFormation),
+      ...getFormationEntities('away', awayFormation),
+      { id: 'ball', type: 'ball', x: 525, y: 340 },
+    ];
+  }
+  const homeLayout = SMALL_SIDED_HOME[preset];
+  const homeEntities: TacticalEntity[] = homeLayout.map((p) => ({
+    id: `h${p.label}`,
+    type: 'home',
+    x: p.x,
+    y: p.y,
+    label: p.label,
+  }));
+  const awayEntities: TacticalEntity[] = homeLayout.map((p) => ({
+    id: `a${p.label}`,
+    type: 'away',
+    x: 1050 - p.x,
+    y: 680 - p.y,
+    label: p.label,
+  }));
+  return [...homeEntities, ...awayEntities, { id: 'ball', type: 'ball', x: 525, y: 340 }];
 }

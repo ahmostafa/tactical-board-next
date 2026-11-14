@@ -23,8 +23,9 @@ import {
   TacticalText,
   EquipmentKind,
 } from './board.store';
-import { FORMATION_NAMES, FormationName } from './formations.data';
+import { FORMATION_NAMES, FormationName, SQUAD_PRESET_OPTIONS, SquadPreset } from './formations.data';
 import { EQUIPMENT_CATALOG, PITCH_ALIGNED_EQUIPMENT, renderEquipmentShape } from './equipment-renderer';
+import { DEMO_TACTICS, DemoTacticPreset, TOUR_STEPS } from './demo-tactics.data';
 import {
   SavedCollectionItem,
   loadCollections,
@@ -97,12 +98,25 @@ const FULL_VIEW_W = 1050 + PITCH_PAD_X * 2; // 1122
 const FULL_VIEW_H = 680 + PITCH_PAD_Y * 2; // 728
 const HALF_VIEW_W = PITCH_PAD_X + 525 + 6; // 567 (outer apron + protruding goal net -> halfway line)
 
+export const BOARD_ZOOM_LEVELS = [0.7, 0.8, 0.9, 1, 1.15, 1.3, 1.5, 1.75, 2];
+
+interface PaletteDragPayload {
+  category: 'squad' | 'equipment';
+  squadType?: 'home' | 'away' | 'referee' | 'ball';
+  roleLabel?: string;
+  roleName?: string;
+  equipmentKind?: EquipmentKind;
+  defaultColor?: string;
+}
+
 @Component({
   selector: 'app-pitch-board',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="w-full max-w-6xl mx-auto p-3 text-white">
+    <div class="w-full mx-auto p-3 text-white overflow-x-auto"
+         [class.max-w-6xl]="boardZoom() <= 1"
+         [class.max-w-full]="boardZoom() > 1">
       <!-- Row 1: Primary Drawing, Arrow Styles, Overlays, History & File Controls -->
       <fieldset class="flex flex-wrap items-center gap-2 mb-2 border-0 p-0 m-0 min-w-0" [disabled]="isPlaying() || isExporting()">
         <button (click)="toggleDrawingMode()"
@@ -202,6 +216,21 @@ const HALF_VIEW_W = PITCH_PAD_X + 525 + 6; // 567 (outer apron + protruding goal
         <button (click)="shareSchemeLink()"
                 class="px-3 py-1.5 text-xs bg-sky-700 hover:bg-sky-600 text-white font-bold rounded shadow-md"
                 title="Copy a shareable link encoding the entire board and animation">Share Link</button>
+        <button (click)="showDemos.set(!showDemos())"
+                class="px-3 py-1.5 text-xs font-bold rounded shadow-md transition-colors"
+                [class.bg-purple-600]="showDemos()"
+                [class.bg-purple-800]="!showDemos()"
+                title="Load pre-built animated tactical demos and drills">
+          Demos (3)
+        </button>
+        <button (click)="toggleTour()"
+                class="px-2.5 py-1.5 text-xs font-bold rounded shadow-md transition-colors"
+                [class.bg-amber-500]="showTour()"
+                [class.text-gray-950]="showTour()"
+                [class.bg-gray-700]="!showTour()"
+                title="Interactive step-by-step guide to all features">
+          ? Tour
+        </button>
         <button (click)="resetBoard()"
                 class="px-3 py-1.5 text-xs bg-gray-700 text-white font-bold rounded shadow-md">Reset</button>
         @if (statusMessage()) {
@@ -209,8 +238,103 @@ const HALF_VIEW_W = PITCH_PAD_X + 525 + 6; // 567 (outer apron + protruding goal
         }
       </fieldset>
 
-      <!-- Row 2: Formations, Team Colors, Pitch Views, Drawing Palette & Equipment Toggle -->
-      <fieldset class="flex flex-wrap items-center gap-3 mb-2 px-3 py-2 rounded bg-gray-800/90 text-xs border-0 m-0 min-w-0" [disabled]="isPlaying() || isExporting()">
+      <!-- Interactive Onboarding Tour Banner -->
+      @if (showTour()) {
+        @if (currentTourStep(); as ts) {
+          <div class="mb-2 p-3 rounded-md bg-gradient-to-r from-indigo-950 via-gray-900 to-slate-900 border border-amber-400/70 shadow-xl text-xs flex flex-col gap-2">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div class="flex items-center gap-2">
+                <span class="px-2 py-0.5 rounded-full bg-amber-400 text-gray-950 font-extrabold">
+                  Step {{ ts.step }} / {{ tourSteps.length }}
+                </span>
+                <span class="px-2 py-0.5 rounded bg-indigo-800 text-indigo-200 font-semibold">{{ ts.badge }}</span>
+                <span class="font-bold text-sm text-white">{{ ts.title }}</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                @for (s of tourSteps; track s.step; let idx = $index) {
+                  <button type="button" (click)="tourIndex.set(idx)"
+                          class="w-2.5 h-2.5 rounded-full transition-all"
+                          [class.bg-amber-400]="idx === tourIndex()"
+                          [class.scale-125]="idx === tourIndex()"
+                          [class.bg-gray-600]="idx !== tourIndex()"
+                          [attr.aria-label]="'Tour step ' + s.step"></button>
+                }
+              </div>
+            </div>
+            <p class="text-gray-200 leading-relaxed">{{ ts.description }}</p>
+            <div class="flex flex-wrap items-center gap-2 pt-1">
+              <button type="button" (click)="prevTourStep()" [disabled]="tourIndex() === 0"
+                      class="px-2.5 py-1 bg-gray-700 hover:bg-gray-600 rounded font-semibold disabled:opacity-40">
+                ← Previous
+              </button>
+              <button type="button" (click)="nextTourStep()" [disabled]="tourIndex() >= tourSteps.length - 1"
+                      class="px-2.5 py-1 bg-gray-700 hover:bg-gray-600 rounded font-semibold disabled:opacity-40">
+                Next →
+              </button>
+              <button type="button" (click)="runTourAction(ts.step)"
+                      class="px-3 py-1 bg-amber-500 hover:bg-amber-400 text-gray-950 font-extrabold rounded shadow">
+                ⚡ {{ ts.tryLabel }}
+              </button>
+              <button type="button" (click)="showTour.set(false)"
+                      class="ml-auto px-2.5 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded">
+                Close Guide
+              </button>
+            </div>
+          </div>
+        }
+      }
+
+      <!-- Collapsible Demo Tactics Starter Pack Drawer -->
+      @if (showDemos()) {
+        <div class="mb-2 p-3 rounded bg-gray-800 border border-purple-500/60 text-xs flex flex-col gap-2">
+          <div class="flex items-center justify-between">
+            <div>
+              <span class="font-bold text-purple-300 text-sm">Interactive Demo Tactics & Drills</span>
+              <span class="ml-2 text-gray-400">Click any preset to load its multi-frame animation onto the pitch, then press Play!</span>
+            </div>
+            <button type="button" (click)="showDemos.set(false)" class="px-2 py-1 bg-gray-700 rounded">Close</button>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+            @for (demo of demoTactics; track demo.id) {
+              <div class="p-2.5 rounded bg-gray-900/90 border border-gray-700 flex flex-col justify-between gap-2">
+                <div>
+                  <div class="flex items-center justify-between gap-1 mb-1">
+                    <span class="font-bold text-white">{{ demo.title }}</span>
+                    <span class="px-1.5 py-0.5 rounded bg-purple-900/80 text-purple-200 text-[10px] font-semibold shrink-0">{{ demo.badge }}</span>
+                  </div>
+                  <p class="text-gray-400 text-[11px] leading-snug">{{ demo.subtitle }}</p>
+                </div>
+                <div class="flex items-center gap-2 pt-1">
+                  <button type="button" (click)="loadDemoTactic(demo, false)"
+                          class="px-2.5 py-1 bg-purple-700 hover:bg-purple-600 text-white font-bold rounded">
+                    Load ({{ demo.frames.length }} steps)
+                  </button>
+                  <button type="button" (click)="loadDemoTactic(demo, true)"
+                          class="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-600 text-white font-bold rounded">
+                    ▶ Load & Play
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- Row 2: Squad Mode, Formations, Team Colors, Pitch Views, Zoom, Drawing Palette & Equipment Toggle -->
+      <fieldset class="flex flex-wrap items-center gap-2.5 mb-2 px-3 py-2 rounded bg-gray-800/90 text-xs border-0 m-0 min-w-0" [disabled]="isPlaying() || isExporting()">
+        <!-- Squad Preset / Empty Pitch Mode -->
+        <div class="flex items-center gap-1.5">
+          <span class="font-bold text-amber-300">Mode:</span>
+          <select aria-label="Squad preset mode"
+                  class="bg-gray-700 text-white rounded px-2 py-1 font-semibold border border-amber-500/40"
+                  [value]="store.squadPreset()"
+                  (change)="onSquadPresetChange($any($event.target).value)">
+            @for (sp of squadPresets; track sp.value) {
+              <option [value]="sp.value">{{ sp.label }}</option>
+            }
+          </select>
+        </div>
+
         <!-- Home Team Formation & Color -->
         <div class="flex items-center gap-1.5">
           <span class="inline-block w-3 h-3 rounded-full border border-white/60" [style.background]="store.homeColor()"></span>
@@ -249,7 +373,7 @@ const HALF_VIEW_W = PITCH_PAD_X + 525 + 6; // 567 (outer apron + protruding goal
 
         <span class="text-gray-600">|</span>
 
-        <!-- Pitch View & Turf Toggles -->
+        <!-- Pitch View, Zoom (70% - 200%) & Turf Toggles -->
         <div class="flex items-center gap-1.5">
           <span class="font-bold text-gray-300">Pitch:</span>
           <select aria-label="Pitch view"
@@ -261,17 +385,31 @@ const HALF_VIEW_W = PITCH_PAD_X + 525 + 6; // 567 (outer apron + protruding goal
             <option value="half-right">Half Pitch (Right)</option>
             <option value="vertical">Full Vertical</option>
           </select>
-          <select aria-label="Board zoom"
-                  class="bg-gray-700 text-white rounded px-2 py-1 font-semibold"
-                  title="Board size"
-                  [value]="boardZoom()"
-                  (change)="setBoardZoom(+$any($event.target).value)">
-            <option value="0.8">80%</option>
-            <option value="0.9">90%</option>
-            <option value="1">100%</option>
-            <option value="1.15">115%</option>
-            <option value="1.3">130%</option>
-          </select>
+
+          <div class="inline-flex items-center rounded bg-gray-700 overflow-hidden" role="group" aria-label="Board zoom controls">
+            <button type="button" (click)="stepBoardZoom(-1)"
+                    class="px-1.5 py-1 hover:bg-gray-600 font-bold"
+                    title="Zoom out" aria-label="Zoom out">−</button>
+            <select aria-label="Board zoom"
+                    class="bg-gray-700 text-white px-1.5 py-1 font-semibold border-x border-gray-600"
+                    title="Board zoom level (up to 200%)"
+                    [value]="boardZoom()"
+                    (change)="setBoardZoom(+$any($event.target).value)">
+              <option value="0.7">70%</option>
+              <option value="0.8">80%</option>
+              <option value="0.9">90% (Fit)</option>
+              <option value="1">100%</option>
+              <option value="1.15">115%</option>
+              <option value="1.3">130%</option>
+              <option value="1.5">150%</option>
+              <option value="1.75">175%</option>
+              <option value="2">200%</option>
+            </select>
+            <button type="button" (click)="stepBoardZoom(1)"
+                    class="px-1.5 py-1 hover:bg-gray-600 font-bold"
+                    title="Zoom in" aria-label="Zoom in">+</button>
+          </div>
+
           <label class="inline-flex items-center gap-1 cursor-pointer ml-1">
             <input type="checkbox" [checked]="showStripes()" (change)="toggleStripes()" />
             Stripes
@@ -331,25 +469,66 @@ const HALF_VIEW_W = PITCH_PAD_X + 525 + 6; // 567 (outer apron + protruding goal
         </button>
       </fieldset>
 
-      <!-- Collapsible Equipment & Squad Tray -->
+      <!-- Drag-and-Drop & Clickable Equipment & Squad Palette -->
       @if (showEquipmentTray()) {
-        <div class="flex flex-wrap items-center gap-2 mb-2 px-3 py-2 rounded bg-gray-800/80 border border-gray-700 text-xs">
-          <span class="font-bold text-amber-400">Add to Pitch:</span>
-          <button type="button" (click)="spawnSquadToken('home')"
-                  class="px-2 py-1 bg-red-700 hover:bg-red-600 rounded font-semibold">+ Home Player</button>
-          <button type="button" (click)="spawnSquadToken('away')"
-                  class="px-2 py-1 bg-blue-700 hover:bg-blue-600 rounded font-semibold">+ Away Player</button>
-          <button type="button" (click)="spawnSquadToken('referee')"
-                  class="px-2 py-1 bg-yellow-600 hover:bg-yellow-500 rounded font-semibold">+ Referee</button>
-          <button type="button" (click)="spawnSquadToken('ball')"
-                  class="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded font-semibold">+ Ball</button>
+        <div class="flex flex-wrap items-center gap-2 mb-2 px-3 py-2 rounded bg-gray-800/85 border border-amber-500/40 text-xs">
+          <span class="font-bold text-amber-400" title="Drag any button directly onto the pitch or click to spawn">
+            Drag to Pitch (or Click):
+          </span>
+          <button type="button"
+                  draggable="true"
+                  (dragstart)="onPaletteDragStart($event, { category: 'squad', squadType: 'home' })"
+                  (click)="spawnSquadToken('home')"
+                  class="px-2 py-1 bg-red-700 hover:bg-red-600 rounded font-semibold cursor-grab active:cursor-grabbing"
+                  title="Drag onto pitch or click to add a Home Player">+ Home Player</button>
+          <button type="button"
+                  draggable="true"
+                  (dragstart)="onPaletteDragStart($event, { category: 'squad', squadType: 'home', roleLabel: '1', roleName: 'GK' })"
+                  (click)="spawnSquadToken('home', undefined, '1', 'GK')"
+                  class="px-2 py-1 bg-red-900 hover:bg-red-800 border border-red-400/50 rounded font-semibold cursor-grab active:cursor-grabbing"
+                  title="Drag onto pitch or click to add a Home Goalkeeper">+ Home GK</button>
+          <button type="button"
+                  draggable="true"
+                  (dragstart)="onPaletteDragStart($event, { category: 'squad', squadType: 'away' })"
+                  (click)="spawnSquadToken('away')"
+                  class="px-2 py-1 bg-blue-700 hover:bg-blue-600 rounded font-semibold cursor-grab active:cursor-grabbing"
+                  title="Drag onto pitch or click to add an Away Player">+ Away Player</button>
+          <button type="button"
+                  draggable="true"
+                  (dragstart)="onPaletteDragStart($event, { category: 'squad', squadType: 'away', roleLabel: '1', roleName: 'GK' })"
+                  (click)="spawnSquadToken('away', undefined, '1', 'GK')"
+                  class="px-2 py-1 bg-blue-900 hover:bg-blue-800 border border-blue-400/50 rounded font-semibold cursor-grab active:cursor-grabbing"
+                  title="Drag onto pitch or click to add an Away Goalkeeper">+ Away GK</button>
+          <button type="button"
+                  draggable="true"
+                  (dragstart)="onPaletteDragStart($event, { category: 'squad', squadType: 'referee' })"
+                  (click)="spawnSquadToken('referee')"
+                  class="px-2 py-1 bg-yellow-600 hover:bg-yellow-500 rounded font-semibold cursor-grab active:cursor-grabbing"
+                  title="Drag onto pitch or click to add a Referee">+ Referee</button>
+          <button type="button"
+                  draggable="true"
+                  (dragstart)="onPaletteDragStart($event, { category: 'squad', squadType: 'ball' })"
+                  (click)="spawnSquadToken('ball')"
+                  class="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded font-semibold cursor-grab active:cursor-grabbing"
+                  title="Drag onto pitch or click to add a Ball">+ Ball</button>
           <span class="text-gray-600">|</span>
           @for (item of equipmentCatalog; track item.kind) {
-            <button type="button" (click)="spawnEquipment(item.kind, item.defaultColor)"
-                    class="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded font-semibold">
+            <button type="button"
+                    draggable="true"
+                    (dragstart)="onPaletteDragStart($event, { category: 'equipment', equipmentKind: item.kind, defaultColor: item.defaultColor })"
+                    (click)="spawnEquipment(item.kind, item.defaultColor)"
+                    class="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded font-semibold cursor-grab active:cursor-grabbing"
+                    [title]="'Drag ' + item.label + ' onto the pitch or click to add'">
               + {{ item.label }}
             </button>
           }
+          <span class="text-gray-600">|</span>
+          <button type="button"
+                  (click)="clearPitchForDrill(false)"
+                  class="px-2 py-1 bg-rose-800 hover:bg-rose-700 rounded font-semibold"
+                  title="Remove all players and equipment so you have a blank pitch">
+            Clear Pitch (Empty)
+          </button>
         </div>
       }
 
@@ -473,6 +652,8 @@ const HALF_VIEW_W = PITCH_PAD_X + 525 + 6; // 567 (outer apron + protruding goal
       <div class="bg-[#2e7d32] shadow-2xl overflow-hidden rounded-md touch-none select-none mx-auto w-full"
            [style.aspect-ratio]="containerAspect()"
            [style.max-width]="containerMaxWidth()"
+           (dragover)="onCanvasDragOver($event)"
+           (drop)="onCanvasDrop($event)"
            #canvasContainer></div>
 
       <!-- Timeline & Export Bar -->
@@ -571,8 +752,11 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
   protected store = inject(BoardStore);
 
   protected readonly formations = FORMATION_NAMES;
+  protected readonly squadPresets = SQUAD_PRESET_OPTIONS;
   protected readonly drawingColors = DRAWING_COLORS;
   protected readonly equipmentCatalog = EQUIPMENT_CATALOG;
+  protected readonly demoTactics = DEMO_TACTICS;
+  protected readonly tourSteps = TOUR_STEPS;
 
   // UI Signals
   activeTool = signal<ActiveToolMode>('move');
@@ -593,6 +777,11 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
   loopPlayback = signal(false);
   showEquipmentTray = signal(false);
   showCollections = signal(false);
+  showDemos = signal(false);
+  showTour = signal(false);
+  tourIndex = signal(0);
+  currentTourStep = computed(() => this.tourSteps[this.tourIndex()] ?? null);
+  private draggedPaletteItem: PaletteDragPayload | null = null;
 
   /** Counter-rotation applied to upright elements (numbers, names, cones, text) when stage is rotated 90 deg in vertical view. */
   uprightRotation = computed(() => (this.pitchView() === 'vertical' ? -90 : 0));
@@ -607,9 +796,14 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
   containerMaxWidth = computed(() => {
     const z = this.boardZoom();
     const v = this.pitchView();
-    if (v === 'vertical') return `min(${Math.round(490 * z)}px, calc((100dvh - 210px) * 0.648 * ${z}))`;
-    if (v === 'half-left' || v === 'half-right') return `min(${Math.round(550 * z)}px, calc((100dvh - 210px) * 0.779 * ${z}))`;
-    return `min(${Math.round(920 * z)}px, calc((100dvh - 210px) * 1.541 * ${z}))`;
+    if (z <= 0.9) {
+      if (v === 'vertical') return `min(${Math.round(490 * z)}px, calc((100dvh - 210px) * 0.648 * ${z}))`;
+      if (v === 'half-left' || v === 'half-right') return `min(${Math.round(550 * z)}px, calc((100dvh - 210px) * 0.779 * ${z}))`;
+      return `min(${Math.round(920 * z)}px, calc((100dvh - 210px) * 1.541 * ${z}))`;
+    }
+    if (v === 'vertical') return `${Math.round(520 * z)}px`;
+    if (v === 'half-left' || v === 'half-right') return `${Math.round(580 * z)}px`;
+    return `${Math.round(960 * z)}px`;
   });
 
   selectedEntityId = signal<string | null>(null);
@@ -737,9 +931,13 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     const uprightRot = this.uprightRotation();
     // Frame coaching note banner at top center of visible pitch if non-empty
     if (frameNote.trim()) {
-      const bannerWidth = Math.min(580, Math.max(220, frameNote.length * 9.2 + 34));
-      const isVert = this.pitchView() === 'vertical';
-      const bx = isVert ? 26 : (this.BASE_WIDTH - bannerWidth) / 2;
+      const view = this.pitchView();
+      const maxBannerW = view === 'half-left' || view === 'half-right' ? 495 : 580;
+      const bannerWidth = Math.min(maxBannerW, Math.max(220, frameNote.length * 8.2 + 28));
+      const isVert = view === 'vertical';
+      const centerX =
+        view === 'half-left' ? 262.5 : view === 'half-right' ? 787.5 : this.BASE_WIDTH / 2;
+      const bx = isVert ? 26 : centerX - bannerWidth / 2;
       const by = isVert ? this.BASE_HEIGHT / 2 : 12;
       const noteGroup = new Konva.Group({
         x: bx,
@@ -1248,6 +1446,25 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     }
   }
 
+  onSquadPresetChange(preset: SquadPreset) {
+    this.store.applySquadPreset(preset);
+    this.selectedEntityId.set(null);
+    if (preset === 'empty') {
+      this.showEquipmentTray.set(true);
+      this.showStatus('Empty Pitch ready — drag players, balls, and equipment onto the pitch');
+    } else {
+      const label = this.squadPresets.find((p) => p.value === preset)?.label ?? preset;
+      this.showStatus(`Switched mode to ${label}`);
+    }
+  }
+
+  clearPitchForDrill(keepBall = false) {
+    this.store.clearEntities(keepBall);
+    this.selectedEntityId.set(null);
+    this.showEquipmentTray.set(true);
+    this.showStatus('Pitch cleared — drag players, balls, and equipment onto the pitch');
+  }
+
   onFormationChange(team: 'home' | 'away', formation: FormationName) {
     this.store.applyFormation(team, formation);
     this.showStatus(`${team === 'home' ? 'Home' : 'Away'} formation set to ${formation}`);
@@ -1272,6 +1489,19 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     setTimeout(() => this.applyStageViewport(), 0);
   }
 
+  stepBoardZoom(delta: -1 | 1) {
+    const current = this.boardZoom();
+    let idx = BOARD_ZOOM_LEVELS.findIndex((z) => Math.abs(z - current) < 0.01);
+    if (idx === -1) {
+      idx = BOARD_ZOOM_LEVELS.findIndex((z) => z >= current);
+      if (idx === -1) idx = BOARD_ZOOM_LEVELS.length - 1;
+    }
+    const nextIdx = Math.max(0, Math.min(BOARD_ZOOM_LEVELS.length - 1, idx + delta));
+    const nextZoom = BOARD_ZOOM_LEVELS[nextIdx];
+    this.setBoardZoom(nextZoom);
+    this.showStatus(`Zoom ${Math.round(nextZoom * 100)}%`);
+  }
+
   toggleStripes() {
     this.showStripes.set(!this.showStripes());
     this.drawPitch();
@@ -1284,34 +1514,159 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     this.pitchLayer.batchDraw();
   }
 
-  spawnSquadToken(type: 'home' | 'away' | 'referee' | 'ball') {
+  onPaletteDragStart(event: DragEvent, payload: PaletteDragPayload) {
+    this.draggedPaletteItem = payload;
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'copy';
+      event.dataTransfer.setData('application/json', JSON.stringify(payload));
+    }
+  }
+
+  onCanvasDragOver(event: DragEvent) {
+    event.preventDefault();
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = 'copy';
+    }
+  }
+
+  onCanvasDrop(event: DragEvent) {
+    event.preventDefault();
+    let payload = this.draggedPaletteItem;
+    this.draggedPaletteItem = null;
+    if (!payload && event.dataTransfer) {
+      try {
+        const raw = event.dataTransfer.getData('application/json');
+        if (raw) payload = JSON.parse(raw);
+      } catch {}
+    }
+    if (!payload || !this.stage) return;
+
+    const rect = this.canvasContainer.nativeElement.getBoundingClientRect();
+    const stageX = event.clientX - rect.left;
+    const stageY = event.clientY - rect.top;
+    const inv = this.stage.getAbsoluteTransform().copy().invert();
+    const pt = inv.point({ x: stageX, y: stageY });
+    const clampedX = Math.max(15, Math.min(this.BASE_WIDTH - 15, Math.round(pt.x)));
+    const clampedY = Math.max(15, Math.min(this.BASE_HEIGHT - 15, Math.round(pt.y)));
+
+    if (payload.category === 'squad' && payload.squadType) {
+      this.spawnSquadToken(payload.squadType, [clampedX, clampedY], payload.roleLabel, payload.roleName);
+    } else if (payload.category === 'equipment' && payload.equipmentKind) {
+      this.spawnEquipment(payload.equipmentKind, payload.defaultColor ?? '#f97316', [clampedX, clampedY]);
+    }
+  }
+
+  spawnSquadToken(
+    type: 'home' | 'away' | 'referee' | 'ball',
+    coords?: [number, number],
+    customLabel?: string,
+    customName?: string
+  ) {
     const existing = this.store.entities().filter((e) => e.type === type);
-    const nextNum = type === 'home' || type === 'away' ? String(existing.length + 1) : type === 'referee' ? 'R' : undefined;
+    const defaultLabel =
+      type === 'home' || type === 'away' ? String(existing.length + 1) : type === 'referee' ? 'R' : undefined;
+    const label = customLabel ?? defaultLabel;
+    const x = coords ? coords[0] : Math.round(525 + (Math.random() * 60 - 30));
+    const y = coords ? coords[1] : Math.round(340 + (Math.random() * 60 - 30));
     const id = this.store.addEntity({
       type,
-      x: 525 + (Math.random() * 60 - 30),
-      y: 340 + (Math.random() * 60 - 30),
-      ...(nextNum ? { label: nextNum } : {}),
+      x,
+      y,
+      ...(label ? { label } : {}),
+      ...(customName ? { name: customName } : {}),
     });
     this.activeTool.set('move');
     this.selectedEntityId.set(id);
     this.updateDraggable();
-    this.showStatus(`Added ${type} token`);
+    this.showStatus(`Added ${customName ?? type} token`);
   }
 
-  spawnEquipment(kind: EquipmentKind, defaultColor: string) {
+  spawnEquipment(kind: EquipmentKind, defaultColor: string, coords?: [number, number]) {
+    const x = coords ? coords[0] : 525 + Math.round(Math.random() * 80 - 40);
+    const y = coords ? coords[1] : 340 + Math.round(Math.random() * 80 - 40);
     const id = this.store.addEntity({
       type: 'equipment',
       equipmentKind: kind,
       color: defaultColor,
       rotation: 0,
-      x: 525 + Math.round(Math.random() * 80 - 40),
-      y: 340 + Math.round(Math.random() * 80 - 40),
+      x,
+      y,
     });
     this.activeTool.set('move');
     this.selectedEntityId.set(id);
     this.updateDraggable();
     this.showStatus(`Added ${kind}`);
+  }
+
+  // ---- Interactive Feature Tour & Built-in Demos ----
+  toggleTour() {
+    const next = !this.showTour();
+    this.showTour.set(next);
+    if (next) {
+      this.tourIndex.set(0);
+    }
+  }
+
+  prevTourStep() {
+    this.tourIndex.set(Math.max(0, this.tourIndex() - 1));
+  }
+
+  nextTourStep() {
+    if (this.tourIndex() >= this.tourSteps.length - 1) {
+      this.showTour.set(false);
+    } else {
+      this.tourIndex.set(this.tourIndex() + 1);
+    }
+  }
+
+  runTourAction(step: number) {
+    if (step === 1) {
+      this.onSquadPresetChange('empty');
+      this.setPitchView('half-right');
+    } else if (step === 2) {
+      this.showEquipmentTray.set(true);
+      this.spawnSquadToken('home', [740, 260], '9', 'Striker');
+      this.spawnSquadToken('away', [880, 340], '4', 'Defender');
+      this.spawnEquipment('cone', '#f97316', [790, 300]);
+    } else if (step === 3) {
+      this.setPitchView(this.pitchView() === 'half-right' ? 'vertical' : 'half-right');
+      this.setBoardZoom(1.15);
+    } else if (step === 4) {
+      this.loadDemoTactic(this.demoTactics[1], false);
+    } else if (step === 5) {
+      const p10 =
+        this.store.entities().find((e) => e.type === 'home' && e.label === '10') ??
+        this.store.entities().find((e) => e.type === 'home');
+      if (p10) {
+        this.selectedEntityId.set(p10.id);
+        this.store.updateEntityMeta(p10.id, { showVision: true, facing: 0, name: 'Playmaker' });
+        this.showStatus('Vision cone enabled on Playmaker #10');
+      }
+    } else if (step === 6) {
+      this.loadDemoTactic(this.demoTactics[0], true);
+    }
+  }
+
+  loadDemoTactic(demo: DemoTacticPreset, autoPlay: boolean) {
+    if (this.isPlaying()) this.stopPlayback();
+    if (
+      this.store.importBoard({
+        version: 1,
+        frames: demo.frames,
+        squadPreset: demo.squadPreset,
+      })
+    ) {
+      this.pitchView.set(demo.pitchView);
+      setTimeout(() => {
+        this.applyStageViewport();
+        this.drawDivisions();
+        this.syncFromStore();
+        this.showStatus(`Loaded demo: "${demo.title}"`);
+        if (autoPlay) {
+          this.play();
+        }
+      }, 20);
+    }
   }
 
   updateSelectedMeta(patch: Partial<TacticalEntity>) {

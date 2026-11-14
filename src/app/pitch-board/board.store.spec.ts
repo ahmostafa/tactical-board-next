@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { BoardStore } from './board.store';
 import { getFormationEntities } from './formations.data';
 import { encodeSchemeHash, decodeSchemeHash } from './board-storage';
+import { DEMO_TACTICS, TOUR_STEPS } from './demo-tactics.data';
 
 describe('BoardStore & Tactical Features', () => {
   let store: InstanceType<typeof BoardStore>;
@@ -93,5 +94,44 @@ describe('BoardStore & Tactical Features', () => {
     expect(decoded).toBeTruthy();
     expect(decoded?.length).toBe(1);
     expect(decoded?.[0].note).toBe('Corner kick routine');
+  });
+
+  it('should support Empty Pitch, 7v7, and 5v5 squad presets and clearing entities', () => {
+    store.applySquadPreset('empty');
+    expect(store.squadPreset()).toBe('empty');
+    expect(store.entities().length).toBe(0);
+
+    store.clearEntities(true);
+    expect(store.entities().length).toBe(1);
+    expect(store.entities()[0].type).toBe('ball');
+
+    store.applySquadPreset('7v7');
+    expect(store.squadPreset()).toBe('7v7');
+    expect(store.entities().filter((e) => e.type === 'home').length).toBe(7);
+    expect(store.entities().filter((e) => e.type === 'away').length).toBe(7);
+
+    store.applySquadPreset('5v5');
+    expect(store.entities().filter((e) => e.type === 'home').length).toBe(5);
+    expect(store.entities().filter((e) => e.type === 'away').length).toBe(5);
+
+    store.clearEntities(false);
+    expect(store.squadPreset()).toBe('empty');
+    expect(store.entities().length).toBe(0);
+  });
+
+  it('should import built-in demo tactics and provide 6 interactive tour steps', () => {
+    expect(TOUR_STEPS.length).toBe(6);
+    expect(DEMO_TACTICS.length).toBe(3);
+
+    const overloadDemo = DEMO_TACTICS[0];
+    const ok = store.importBoard({
+      version: 3,
+      squadPreset: overloadDemo.squadPreset,
+      frames: overloadDemo.frames,
+    });
+    expect(ok).toBe(true);
+    expect(store.squadPreset()).toBe('empty');
+    expect(store.frameCount()).toBe(3);
+    expect(store.entities().length).toBe(10);
   });
 });
