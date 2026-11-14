@@ -34,6 +34,9 @@ import {
   PITCH_PAD_X,
   PITCH_PAD_Y,
   PaletteDragPayload,
+  PitchDivisionGridMode,
+  PitchDivisionsConfig,
+  PitchSubZoneId,
   PitchViewMode,
   STORAGE_KEY,
   SavedCollectionItem,
@@ -60,6 +63,10 @@ import {
   drawPitchSurface,
   renderGoalScoredOverlay,
 } from './canvas/pitch-renderer';
+import {
+  DEFAULT_DIVISIONS_CONFIG,
+  isAnyDivisionActive,
+} from './canvas/pitch-divisions';
 import {
   createArrowGroup,
   createShapeNode,
@@ -118,7 +125,16 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
   boardZoom = signal(0.9);
   showStripes = signal(true);
   showMarkings = signal(true);
-  showDivisions = signal(false);
+  divisionsConfig = signal<PitchDivisionsConfig>({
+    grid: 'none',
+    subZones: { ...DEFAULT_DIVISIONS_CONFIG.subZones },
+    mirrorSubZones: false,
+  });
+  showDivisionsPanel = signal(false);
+  showDivisions = computed(() => isAnyDivisionActive(this.divisionsConfig()));
+  activeSubZoneCount = computed(
+    () => Object.values(this.divisionsConfig().subZones).filter(Boolean).length
+  );
   showGhost = signal(true);
   loopPlayback = signal(false);
   showEquipmentTray = signal(false);
@@ -218,7 +234,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     this.ngZone.runOutsideAngular(() => {
       this.initCanvas();
       drawPitchSurface(this.pitchLayer, this.showStripes(), this.showMarkings());
-      drawPitchDivisions(this.divisionsLayer, this.uprightRotation());
+      this.refreshDivisionsLayer();
       this.syncFromStore();
       this.setupDrawingEngine();
       this.setupResponsiveObserver();
@@ -418,7 +434,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     this.pitchView.set(view);
     setTimeout(() => {
       this.applyStageViewport();
-      drawPitchDivisions(this.divisionsLayer, this.uprightRotation());
+      this.refreshDivisionsLayer();
       this.syncFromStore();
     }, 0);
   }
@@ -453,10 +469,74 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     this.pitchLayer.batchDraw();
   }
 
+  private refreshDivisionsLayer() {
+    if (!this.divisionsLayer) return;
+    drawPitchDivisions(
+      this.divisionsLayer,
+      this.uprightRotation(),
+      this.divisionsConfig(),
+      this.pitchView()
+    );
+  }
+
   toggleDivisions() {
-    this.showDivisions.set(!this.showDivisions());
-    this.divisionsLayer.visible(this.showDivisions());
-    this.divisionsLayer.batchDraw();
+    const nextPanel = !this.showDivisionsPanel();
+    this.showDivisionsPanel.set(nextPanel);
+    if (nextPanel && !this.showDivisions()) {
+      this.divisionsConfig.update((c) => ({ ...c, grid: 'thirds-channels' }));
+      this.refreshDivisionsLayer();
+      this.showStatus('Pitch Divisions active — choose Grid or Sub-Zones below');
+    }
+  }
+
+  setDivisionGrid(grid: PitchDivisionGridMode) {
+    this.divisionsConfig.update((c) => ({ ...c, grid }));
+    if (grid !== 'none') {
+      this.showDivisionsPanel.set(true);
+    }
+    this.refreshDivisionsLayer();
+    const names: Record<PitchDivisionGridMode, string> = {
+      none: 'Primary Grid hidden',
+      'thirds-channels': 'Grid: Thirds & 5 Vertical Channels',
+      'zones-18': 'Grid: Standard 18-Zone Grid (3×6)',
+      'zones-20': 'Grid: 20-Zone Juego de Posición (5×4)',
+    };
+    this.showStatus(names[grid]);
+  }
+
+  toggleSubZone(id: PitchSubZoneId) {
+    this.divisionsConfig.update((c) => ({
+      ...c,
+      subZones: {
+        ...c.subZones,
+        [id]: !c.subZones[id],
+      },
+    }));
+    this.refreshDivisionsLayer();
+  }
+
+  toggleMirrorSubZones() {
+    this.divisionsConfig.update((c) => ({ ...c, mirrorSubZones: !c.mirrorSubZones }));
+    this.refreshDivisionsLayer();
+  }
+
+  enableAllSubZones() {
+    this.divisionsConfig.update((c) => ({
+      ...c,
+      subZones: { zone14: true, goldenZone: true, pockets: true, cutback: true },
+    }));
+    this.refreshDivisionsLayer();
+    this.showStatus('Enabled Zone 14, Golden Zone, Pockets & Byline Cutback');
+  }
+
+  clearAllDivisions() {
+    this.divisionsConfig.set({
+      grid: 'none',
+      subZones: { zone14: false, goldenZone: false, pockets: false, cutback: false },
+      mirrorSubZones: false,
+    });
+    this.refreshDivisionsLayer();
+    this.showStatus('Cleared all pitch divisions and sub-zones');
   }
 
   // ---- Drag & Drop Palette & Entity Spawning ----
@@ -630,7 +710,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
       this.pitchView.set(demo.pitchView);
       setTimeout(() => {
         this.applyStageViewport();
-        drawPitchDivisions(this.divisionsLayer, this.uprightRotation());
+        this.refreshDivisionsLayer();
         this.syncFromStore();
         this.showStatus(`Loaded demo: "${demo.title}"`);
         if (autoPlay) this.play();

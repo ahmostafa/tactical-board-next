@@ -13,7 +13,8 @@ Stack: Angular 22 (standalone, signals, OnPush), `@ngrx/signals`, Konva 10 (outs
 - `src/app/pitch-board/board-storage.ts`: `localStorage` Collections library (`tactical-board:collections:v1`) and `#scheme=` base64url URL hash codec.
 - `src/app/pitch-board/formations.data.ts` & `src/app/pitch-board/demo-tactics.data.ts`: 7 11v11 formations, 5 squad presets (`11v11`, `9v9`, `7v7`, `5v5`, `empty`), 6 interactive tour steps, and 3 animated demo tactics.
 - `src/app/pitch-board/canvas/`:
-  - `pitch-renderer.ts`: stadium apron, mowed grass stripes, markings, protruding woven goal nets, 18-zone pitch divisions, classic football, and `"⚽ GOAL!"` banner.
+  - `pitch-renderer.ts`: stadium apron, mowed grass stripes, markings, protruding woven goal nets, classic football, and `"⚽ GOAL!"` banner.
+  - `pitch-divisions.ts`: FIFA `105m × 68m` coordinate mapping (`getZone18`, `getZone20`, `getTacticalLocationSummary`) and multi-mode `drawPitchDivisions` (`thirds-channels`, `zones-18`, `zones-20` + independent `Zone 14`, `Golden Zone`, `Pockets`, and `Byline Cutback` sub-zones; see [references/pitch-divisions-reference.md](references/pitch-divisions-reference.md)).
   - `arrow-renderer.ts`: `computeArrowPath` (straight, quadratic Bézier curves, wavy dribbles, Target Zone trimming), `computeTBarPoints` (`Block ┬`), zone shapes, and ghost trails.
   - `entity-renderer.ts`: `syncEntityNodes` (players, balls, referees, equipment, vision cones, upright numbers/names) and `renderTextsOnLayer` (coaching note banner + draggable text labels).
   - `equipment-renderer.ts`: 9 vector training equipment shapes and catalog.

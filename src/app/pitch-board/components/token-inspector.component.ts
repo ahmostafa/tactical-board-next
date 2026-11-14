@@ -1,5 +1,6 @@
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { TacticalEntity } from '../models/tactical-board.models';
+import { getTacticalLocationSummary } from '../canvas/pitch-divisions';
 
 @Component({
   selector: 'app-token-inspector',
@@ -11,6 +12,23 @@ import { TacticalEntity } from '../models/tactical-board.models';
         <span class="font-bold text-indigo-300">
           Selected: {{ sel.type === 'home' ? 'Home Player' : sel.type === 'away' ? 'Away Player' : sel.type === 'referee' ? 'Referee' : sel.equipmentKind || 'Ball' }}
         </span>
+
+        @if (location(); as loc) {
+          <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-900/90 border border-indigo-400/40 text-[11px] text-slate-200"
+                title="Normalized FIFA 105m × 68m coordinates, 18-Zone Grid, and 20-Zone Juego de Posición code">
+            <span class="text-amber-300 font-semibold">Zone {{ loc.zone18 }}</span>
+            <span class="text-slate-500">·</span>
+            <span class="text-sky-300 font-semibold">{{ loc.zone20 }}</span>
+            <span class="text-slate-500">·</span>
+            <span class="text-slate-300">{{ loc.xMeters }}m × {{ loc.yMeters }}m</span>
+            <span class="hidden md:inline text-slate-400">({{ loc.third }} / {{ loc.channel }})</span>
+            @for (sub of loc.subZones; track sub) {
+              <span class="px-1.5 py-0.2 rounded bg-amber-500/20 border border-amber-400/50 text-amber-200 font-bold text-[10px]">
+                {{ sub }}
+              </span>
+            }
+          </span>
+        }
 
         @if (sel.type === 'home' || sel.type === 'away' || sel.type === 'referee') {
           <label class="flex items-center gap-1">
@@ -72,4 +90,9 @@ export class TokenInspectorComponent {
   updateMeta = output<Partial<TacticalEntity>>();
   removeEntity = output<void>();
   closeInspector = output<void>();
+
+  protected location = computed(() => {
+    const e = this.entity();
+    return e ? getTacticalLocationSummary(e.x, e.y) : null;
+  });
 }

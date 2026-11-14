@@ -30,6 +30,34 @@ export type PitchViewMode = 'full' | 'half-left' | 'half-right' | 'vertical';
 
 export type ActiveToolMode = 'move' | 'arrow' | 'shape' | 'text' | 'eraser';
 
+/**
+ * Mutually exclusive primary coordinate grid modes for the pitch divisions overlay.
+ * Only one full-pitch grid is displayed at a time so grid lines and labels never clash.
+ */
+export type PitchDivisionGridMode = 'none' | 'thirds-channels' | 'zones-18' | 'zones-20';
+
+/**
+ * Independent specialized tactical sub-zones that can be toggled on/off in any combination.
+ */
+export type PitchSubZoneId = 'zone14' | 'goldenZone' | 'pockets' | 'cutback';
+
+export interface PitchDivisionsConfig {
+  grid: PitchDivisionGridMode;
+  subZones: Record<PitchSubZoneId, boolean>;
+  /** When true, specialized sub-zones are rendered on both attacking (right) and defensive (left) halves. */
+  mirrorSubZones: boolean;
+}
+
+export interface TacticalLocationSummary {
+  xMeters: number;
+  yMeters: number;
+  zone18: number;
+  zone20: string;
+  third: 'Defensive Third' | 'Middle Third' | 'Final Third';
+  channel: 'Left Flank' | 'Left Half-Space' | 'Central Corridor' | 'Right Half-Space' | 'Right Flank';
+  subZones: string[];
+}
+
 export interface TacticalEntity {
   id: string;
   type: 'home' | 'away' | 'ball' | 'referee' | 'equipment';

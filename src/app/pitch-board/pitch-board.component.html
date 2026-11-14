@@ -75,9 +75,13 @@
 
     <button (click)="toggleDivisions()"
             class="px-3 py-1.5 text-xs text-white font-bold rounded shadow-md transition-colors"
-            [class.bg-gray-700]="!showDivisions()"
-            [class.bg-emerald-600]="showDivisions()">
+            [class.bg-gray-700]="!showDivisions() && !showDivisionsPanel()"
+            [class.bg-emerald-600]="showDivisions() || showDivisionsPanel()"
+            title="Show/hide pitch grids (Thirds & 5 Channels, 18-Zone, 20-Zone) and specialized sub-zones (Zone 14, Golden Zone, Pockets, Cutbacks)">
       Pitch Divisions
+      @if (activeSubZoneCount() > 0) {
+        <span class="ml-1 px-1 py-0.2 rounded bg-amber-400 text-gray-950 text-[10px]">+{{ activeSubZoneCount() }}</span>
+      }
     </button>
 
     <button (click)="store.undo()" [disabled]="!store.canUndo()"
@@ -235,6 +239,16 @@
         <input type="checkbox" [checked]="showMarkings()" (change)="toggleMarkings()" />
         Lines
       </label>
+      <select aria-label="Pitch division grid"
+              class="bg-gray-700 text-white rounded px-2 py-1 font-semibold ml-1 border border-emerald-500/40"
+              title="Primary pitch coordinate grid (mutually exclusive)"
+              [value]="divisionsConfig().grid"
+              (change)="setDivisionGrid($any($event.target).value)">
+        <option value="none">Grid: Off</option>
+        <option value="thirds-channels">Grid: Thirds &amp; 5 Channels</option>
+        <option value="zones-18">Grid: 18-Zone (1–18)</option>
+        <option value="zones-20">Grid: 20-Zone (Positional)</option>
+      </select>
     </div>
 
     <span class="text-gray-600">|</span>
@@ -285,6 +299,111 @@
       {{ showEquipmentTray() ? 'Hide Equipment & Bench' : '+ Equipment & Bench' }}
     </button>
   </fieldset>
+
+  <!-- Collapsible Pitch Tactical Divisions & Specialized Sub-Zones Bar -->
+  @if (showDivisionsPanel()) {
+    <div class="flex flex-wrap items-center gap-2 mb-2 px-3 py-2 rounded bg-emerald-950/85 border border-emerald-500/50 text-xs">
+      <div class="flex flex-wrap items-center gap-1.5">
+        <span class="font-bold text-emerald-300">Primary Grid (Pick 1):</span>
+        <div class="inline-flex rounded overflow-hidden border border-emerald-600/50" role="group" aria-label="Primary coordinate grid">
+          <button type="button" (click)="setDivisionGrid('none')"
+                  class="px-2.5 py-1 font-bold transition-colors"
+                  [class.bg-emerald-600]="divisionsConfig().grid === 'none'"
+                  [class.bg-gray-800]="divisionsConfig().grid !== 'none'"
+                  title="No full-pitch grid lines (sub-zones can still be shown cleanly)">
+            Off
+          </button>
+          <button type="button" (click)="setDivisionGrid('thirds-channels')"
+                  class="px-2.5 py-1 font-bold border-l border-gray-700 transition-colors"
+                  [class.bg-emerald-600]="divisionsConfig().grid === 'thirds-channels'"
+                  [class.bg-gray-800]="divisionsConfig().grid !== 'thirds-channels'"
+                  title="3 Horizontal Thirds (0–35–70–105m) + 5 FIFA-marking Vertical Channels">
+            Thirds &amp; 5 Channels
+          </button>
+          <button type="button" (click)="setDivisionGrid('zones-18')"
+                  class="px-2.5 py-1 font-bold border-l border-gray-700 transition-colors"
+                  [class.bg-emerald-600]="divisionsConfig().grid === 'zones-18'"
+                  [class.bg-gray-800]="divisionsConfig().grid !== 'zones-18'"
+                  title="Standard 18-Zone Grid (3 equal lanes × 6 strips, numbered 1 to 18)">
+            18-Zone Grid (1–18)
+          </button>
+          <button type="button" (click)="setDivisionGrid('zones-20')"
+                  class="px-2.5 py-1 font-bold border-l border-gray-700 transition-colors"
+                  [class.bg-emerald-600]="divisionsConfig().grid === 'zones-20'"
+                  [class.bg-gray-800]="divisionsConfig().grid !== 'zones-20'"
+                  title="20-Zone Juego de Posición (5 Channels × 4 Tiers: Build-Up, Progression, Creation, Finishing)">
+            20-Zone Positional (B-LF..F-RF)
+          </button>
+        </div>
+      </div>
+
+      <span class="text-emerald-700">|</span>
+
+      <div class="flex flex-wrap items-center gap-1.5">
+        <span class="font-bold text-amber-300">Sub-Zones (Layer Any):</span>
+        <button type="button" (click)="toggleSubZone('zone14')"
+                class="px-2.5 py-1 rounded font-bold border transition-colors"
+                [class.bg-amber-600]="divisionsConfig().subZones.zone14"
+                [class.border-amber-300]="divisionsConfig().subZones.zone14"
+                [class.bg-gray-800]="!divisionsConfig().subZones.zone14"
+                [class.border-gray-600]="!divisionsConfig().subZones.zone14"
+                title="Zone 14 (Assist Zone): X 70–88.5m, Y 22.67–45.33m directly in front of opponent penalty box">
+          Zone 14 (Assist)
+        </button>
+        <button type="button" (click)="toggleSubZone('goldenZone')"
+                class="px-2.5 py-1 rounded font-bold border transition-colors"
+                [class.bg-emerald-600]="divisionsConfig().subZones.goldenZone"
+                [class.border-emerald-300]="divisionsConfig().subZones.goldenZone"
+                [class.bg-gray-800]="!divisionsConfig().subZones.goldenZone"
+                [class.border-gray-600]="!divisionsConfig().subZones.goldenZone"
+                title="Golden Zone: Central high-xG rectangle inside penalty box (X 94–105m, Y 24.84–43.16m)">
+          Golden Zone
+        </button>
+        <button type="button" (click)="toggleSubZone('pockets')"
+                class="px-2.5 py-1 rounded font-bold border transition-colors"
+                [class.bg-sky-600]="divisionsConfig().subZones.pockets"
+                [class.border-sky-300]="divisionsConfig().subZones.pockets"
+                [class.bg-gray-800]="!divisionsConfig().subZones.pockets"
+                [class.border-gray-600]="!divisionsConfig().subZones.pockets"
+                title="The Pockets: Left & Right Half-Spaces between opposition midfield and defensive lines (X 52.5–88.5m)">
+          Half-Space Pockets
+        </button>
+        <button type="button" (click)="toggleSubZone('cutback')"
+                class="px-2.5 py-1 rounded font-bold border transition-colors"
+                [class.bg-purple-600]="divisionsConfig().subZones.cutback"
+                [class.border-purple-300]="divisionsConfig().subZones.cutback"
+                [class.bg-gray-800]="!divisionsConfig().subZones.cutback"
+                [class.border-gray-600]="!divisionsConfig().subZones.cutback"
+                title="Byline Cutback Zones: Penalty box wide channels between 6-yard and 18-yard lines (X 88.5–105m)">
+          Byline Cutback
+        </button>
+        <button type="button" (click)="toggleMirrorSubZones()"
+                class="px-2 py-1 rounded font-semibold border transition-colors"
+                [class.bg-indigo-600]="divisionsConfig().mirrorSubZones"
+                [class.border-indigo-300]="divisionsConfig().mirrorSubZones"
+                [class.bg-gray-800]="!divisionsConfig().mirrorSubZones"
+                [class.border-gray-600]="!divisionsConfig().mirrorSubZones"
+                title="Mirror specialized sub-zones onto both defensive and attacking halves">
+          ⇄ Both Halves
+        </button>
+      </div>
+
+      <div class="ml-auto flex items-center gap-1.5">
+        <button type="button" (click)="enableAllSubZones()"
+                class="px-2 py-1 rounded bg-amber-700/80 hover:bg-amber-600 font-semibold">
+          All Sub-Zones
+        </button>
+        <button type="button" (click)="clearAllDivisions()"
+                class="px-2 py-1 rounded bg-rose-800/80 hover:bg-rose-700 font-semibold">
+          Hide All
+        </button>
+        <button type="button" (click)="showDivisionsPanel.set(false)"
+                class="px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 font-semibold">
+          ✕
+        </button>
+      </div>
+    </div>
+  }
 
   <!-- Drag-and-Drop & Clickable Equipment & Squad Palette -->
   @if (showEquipmentTray()) {

@@ -4,6 +4,7 @@ import { getFormationEntities } from './formations.data';
 import { encodeSchemeHash, decodeSchemeHash } from './board-storage';
 import { DEMO_TACTICS, TOUR_STEPS } from './demo-tactics.data';
 import { computeArrowPath, computeTBarPoints } from './canvas/arrow-renderer';
+import { getTacticalLocationSummary, getZone18, getZone20 } from './canvas/pitch-divisions';
 
 describe('BoardStore & Tactical Features', () => {
   let store: InstanceType<typeof BoardStore>;
@@ -148,5 +149,28 @@ describe('BoardStore & Tactical Features', () => {
 
     const tbar = computeTBarPoints([100, 100, 200, 100]);
     expect(tbar).toEqual([200, 86, 200, 114]);
+  });
+
+  it('should map FIFA 105m x 68m coordinates to 18-Zone, 20-Zone, and Specialized Sub-Zones', () => {
+    expect(getZone18(5, 10)).toBe(1);
+    expect(getZone18(5, 34)).toBe(2);
+    expect(getZone18(78, 34)).toBe(14);
+    expect(getZone18(98, 34)).toBe(17);
+    expect(getZone18(104, 65)).toBe(18);
+
+    expect(getZone20(10, 5)).toBe('B-LF');
+    expect(getZone20(65, 19)).toBe('C-LHS');
+    expect(getZone20(65, 48)).toBe('C-RHS');
+    expect(getZone20(95, 34)).toBe('F-C');
+
+    const z14Summary = getTacticalLocationSummary(780, 340);
+    expect(z14Summary.zone18).toBe(14);
+    expect(z14Summary.third).toBe('Final Third');
+    expect(z14Summary.channel).toBe('Central Corridor');
+    expect(z14Summary.subZones).toContain('Zone 14 (Assist)');
+
+    const goldenSummary = getTacticalLocationSummary(980, 340);
+    expect(goldenSummary.zone18).toBe(17);
+    expect(goldenSummary.subZones).toContain('Golden Zone');
   });
 });
