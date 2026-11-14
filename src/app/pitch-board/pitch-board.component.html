@@ -1,0 +1,359 @@
+<div class="w-full mx-auto p-3 text-white overflow-x-auto"
+     [class.max-w-6xl]="boardZoom() <= 1"
+     [class.max-w-full]="boardZoom() > 1">
+  <!-- Row 1: Primary Drawing, Arrow Styles, Overlays, History & File Controls -->
+  <fieldset class="flex flex-wrap items-center gap-2 mb-2 border-0 p-0 m-0 min-w-0" [disabled]="isPlaying() || isExporting()">
+    <button (click)="toggleDrawingMode()"
+            class="px-3 py-1.5 text-sm text-white font-bold rounded shadow-md transition-colors"
+            [class.bg-blue-600]="!isDrawingMode()"
+            [class.bg-red-600]="isDrawingMode()">
+      {{ isDrawingMode() ? 'Stop Drawing (Back to Dragging)' : 'Draw Tactical Arrows' }}
+    </button>
+
+    <!-- Line & Arrow Styles -->
+    <div class="inline-flex rounded shadow-md overflow-hidden" role="group" aria-label="Arrow style">
+      <button (click)="selectArrowStyle('pass')"
+              class="px-2.5 py-1.5 text-xs font-bold text-white transition-colors"
+              [class.bg-amber-600]="activeTool() === 'arrow' && arrowStyle() === 'pass'"
+              [class.bg-gray-700]="!(activeTool() === 'arrow' && arrowStyle() === 'pass')"
+              title="Solid arrow for passes">Pass</button>
+      <button (click)="selectArrowStyle('run')"
+              class="px-2.5 py-1.5 text-xs font-bold text-white border-l border-gray-600 transition-colors"
+              [class.bg-amber-600]="activeTool() === 'arrow' && arrowStyle() === 'run'"
+              [class.bg-gray-700]="!(activeTool() === 'arrow' && arrowStyle() === 'run')"
+              title="Dashed arrow for off-the-ball runs">Run</button>
+      <button (click)="selectArrowStyle('dribble')"
+              class="px-2.5 py-1.5 text-xs font-bold text-white border-l border-gray-600 transition-colors"
+              [class.bg-amber-600]="activeTool() === 'arrow' && arrowStyle() === 'dribble'"
+              [class.bg-gray-700]="!(activeTool() === 'arrow' && arrowStyle() === 'dribble')"
+              title="Wavy arrow for ball carrier dribbles">Dribble</button>
+      <button (click)="selectArrowStyle('zone')"
+              class="px-2.5 py-1.5 text-xs font-bold text-white border-l border-gray-600 transition-colors"
+              [class.bg-amber-600]="activeTool() === 'arrow' && arrowStyle() === 'zone'"
+              [class.bg-gray-700]="!(activeTool() === 'arrow' && arrowStyle() === 'zone')"
+              title="Arrow pointing into a highlighted empty space / target zone">Target Zone</button>
+      <button (click)="selectArrowStyle('block')"
+              class="px-2.5 py-1.5 text-xs font-bold text-white border-l border-gray-600 transition-colors"
+              [class.bg-amber-600]="activeTool() === 'arrow' && arrowStyle() === 'block'"
+              [class.bg-gray-700]="!(activeTool() === 'arrow' && arrowStyle() === 'block')"
+              title="Defensive block / screen line with perpendicular T-bar cap">Block ┬</button>
+      <button (click)="selectArrowStyle('freehand')"
+              class="px-2.5 py-1.5 text-xs font-bold text-white border-l border-gray-600 transition-colors"
+              [class.bg-amber-600]="activeTool() === 'arrow' && arrowStyle() === 'freehand'"
+              [class.bg-gray-700]="!(activeTool() === 'arrow' && arrowStyle() === 'freehand')"
+              title="Freehand pencil sketch">Freehand</button>
+    </div>
+
+    <!-- Shapes, Text & Eraser -->
+    <div class="inline-flex rounded shadow-md overflow-hidden" role="group" aria-label="Shapes and annotation tools">
+      <button (click)="selectShapeTool('rect')"
+              class="px-2.5 py-1.5 text-xs font-bold text-white transition-colors"
+              [class.bg-indigo-600]="activeTool() === 'shape' && shapeKind() === 'rect'"
+              [class.bg-gray-700]="!(activeTool() === 'shape' && shapeKind() === 'rect')"
+              title="Draw rectangular tactical zone">Rect Zone</button>
+      <button (click)="selectShapeTool('ellipse')"
+              class="px-2.5 py-1.5 text-xs font-bold text-white border-l border-gray-600 transition-colors"
+              [class.bg-indigo-600]="activeTool() === 'shape' && shapeKind() === 'ellipse'"
+              [class.bg-gray-700]="!(activeTool() === 'shape' && shapeKind() === 'ellipse')"
+              title="Draw circular/elliptical pressing zone">Circle Zone</button>
+      <button (click)="selectShapeTool('triangle')"
+              class="px-2.5 py-1.5 text-xs font-bold text-white border-l border-gray-600 transition-colors"
+              [class.bg-indigo-600]="activeTool() === 'shape' && shapeKind() === 'triangle'"
+              [class.bg-gray-700]="!(activeTool() === 'shape' && shapeKind() === 'triangle')"
+              title="Draw triangular pressing trap / cover shadow">Triangle</button>
+      <button (click)="selectTextTool()"
+              class="px-2.5 py-1.5 text-xs font-bold text-white border-l border-gray-600 transition-colors"
+              [class.bg-indigo-600]="activeTool() === 'text'"
+              [class.bg-gray-700]="activeTool() !== 'text'"
+              title="Click on pitch to place a draggable text label">Text</button>
+      <button (click)="selectEraserTool()"
+              class="px-2.5 py-1.5 text-xs font-bold text-white border-l border-gray-600 transition-colors"
+              [class.bg-rose-600]="activeTool() === 'eraser'"
+              [class.bg-gray-700]="activeTool() !== 'eraser'"
+              title="Click any arrow, zone, text, or equipment item to delete it">Eraser</button>
+    </div>
+
+    <button (click)="toggleDivisions()"
+            class="px-3 py-1.5 text-xs text-white font-bold rounded shadow-md transition-colors"
+            [class.bg-gray-700]="!showDivisions()"
+            [class.bg-emerald-600]="showDivisions()">
+      Pitch Divisions
+    </button>
+
+    <button (click)="store.undo()" [disabled]="!store.canUndo()"
+            class="px-3 py-1.5 text-xs bg-gray-700 text-white font-bold rounded shadow-md disabled:opacity-40">Undo</button>
+    <button (click)="store.redo()" [disabled]="!store.canRedo()"
+            class="px-3 py-1.5 text-xs bg-gray-700 text-white font-bold rounded shadow-md disabled:opacity-40">Redo</button>
+    <button (click)="store.clearArrows()" [disabled]="!store.hasArrows()"
+            class="px-3 py-1.5 text-xs bg-gray-700 text-white font-bold rounded shadow-md disabled:opacity-40">Clear Arrows</button>
+    <button (click)="saveBoard()"
+            class="px-3 py-1.5 text-xs bg-emerald-700 text-white font-bold rounded shadow-md">Save</button>
+    <button (click)="loadBoard()" [disabled]="!hasSavedBoard()"
+            class="px-3 py-1.5 text-xs bg-emerald-700 text-white font-bold rounded shadow-md disabled:opacity-40">Load</button>
+    <button (click)="showCollections.set(!showCollections())"
+            class="px-3 py-1.5 text-xs font-bold rounded shadow-md transition-colors"
+            [class.bg-teal-600]="showCollections()"
+            [class.bg-gray-700]="!showCollections()"
+            title="Open multi-board Collections library and JSON import/export">
+      Collections ({{ collections().length }})
+    </button>
+    <button (click)="shareSchemeLink()"
+            class="px-3 py-1.5 text-xs bg-sky-700 hover:bg-sky-600 text-white font-bold rounded shadow-md"
+            title="Copy a shareable link encoding the entire board and animation">Share Link</button>
+    <button (click)="showDemos.set(!showDemos())"
+            class="px-3 py-1.5 text-xs font-bold rounded shadow-md transition-colors"
+            [class.bg-purple-600]="showDemos()"
+            [class.bg-purple-800]="!showDemos()"
+            title="Load pre-built animated tactical demos and drills">
+      Demos (3)
+    </button>
+    <button (click)="toggleTour()"
+            class="px-2.5 py-1.5 text-xs font-bold rounded shadow-md transition-colors"
+            [class.bg-amber-500]="showTour()"
+            [class.text-gray-950]="showTour()"
+            [class.bg-gray-700]="!showTour()"
+            title="Interactive step-by-step guide to all features">
+      ? Tour
+    </button>
+    <button (click)="resetBoard()"
+            class="px-3 py-1.5 text-xs bg-gray-700 text-white font-bold rounded shadow-md">Reset</button>
+    @if (statusMessage()) {
+      <span class="self-center text-xs text-amber-300 font-semibold">{{ statusMessage() }}</span>
+    }
+  </fieldset>
+
+  <!-- Interactive Tour & Built-In Demo Tactics Panel -->
+  <app-tour-demos-panel
+    [showTour]="showTour()"
+    [tourIndex]="tourIndex()"
+    [tourSteps]="tourSteps"
+    [showDemos]="showDemos()"
+    [demoTactics]="demoTactics"
+    (selectStep)="tourIndex.set($event)"
+    (prevStep)="prevTourStep()"
+    (nextStep)="nextTourStep()"
+    (tryAction)="runTourAction($event)"
+    (closeTour)="showTour.set(false)"
+    (closeDemos)="showDemos.set(false)"
+    (loadDemo)="loadDemoTactic($event.demo, $event.autoPlay)" />
+
+  <!-- Row 2: Squad Mode, Formations, Team Colors, Pitch Views, Zoom, Drawing Palette & Equipment Toggle -->
+  <fieldset class="flex flex-wrap items-center gap-2.5 mb-2 px-3 py-2 rounded bg-gray-800/90 text-xs border-0 m-0 min-w-0" [disabled]="isPlaying() || isExporting()">
+    <!-- Squad Preset / Empty Pitch Mode -->
+    <div class="flex items-center gap-1.5">
+      <span class="font-bold text-amber-300">Mode:</span>
+      <select aria-label="Squad preset mode"
+              class="bg-gray-700 text-white rounded px-2 py-1 font-semibold border border-amber-500/40"
+              [value]="store.squadPreset()"
+              (change)="onSquadPresetChange($any($event.target).value)">
+        @for (sp of squadPresets; track sp.value) {
+          <option [value]="sp.value">{{ sp.label }}</option>
+        }
+      </select>
+    </div>
+
+    <!-- Home Team Formation & Color -->
+    <div class="flex items-center gap-1.5">
+      <span class="inline-block w-3 h-3 rounded-full border border-white/60" [style.background]="store.homeColor()"></span>
+      <span class="font-bold text-gray-200">Home:</span>
+      <select aria-label="Home formation"
+              class="bg-gray-700 text-white rounded px-2 py-1 font-semibold"
+              [value]="store.homeFormation()"
+              (change)="onFormationChange('home', $any($event.target).value)">
+        @for (f of formations; track f) {
+          <option [value]="f">{{ f }}</option>
+        }
+      </select>
+      <input type="color" aria-label="Home team color"
+             class="w-6 h-6 rounded cursor-pointer bg-transparent border-0"
+             [value]="store.homeColor()"
+             (input)="onTeamColorChange('home', $any($event.target).value)" />
+    </div>
+
+    <!-- Away Team Formation & Color -->
+    <div class="flex items-center gap-1.5">
+      <span class="inline-block w-3 h-3 rounded-full border border-white/60" [style.background]="store.awayColor()"></span>
+      <span class="font-bold text-gray-200">Away:</span>
+      <select aria-label="Away formation"
+              class="bg-gray-700 text-white rounded px-2 py-1 font-semibold"
+              [value]="store.awayFormation()"
+              (change)="onFormationChange('away', $any($event.target).value)">
+        @for (f of formations; track f) {
+          <option [value]="f">{{ f }}</option>
+        }
+      </select>
+      <input type="color" aria-label="Away team color"
+             class="w-6 h-6 rounded cursor-pointer bg-transparent border-0"
+             [value]="store.awayColor()"
+             (input)="onTeamColorChange('away', $any($event.target).value)" />
+    </div>
+
+    <span class="text-gray-600">|</span>
+
+    <!-- Pitch View, Zoom (70% - 200%) & Turf Toggles -->
+    <div class="flex items-center gap-1.5">
+      <span class="font-bold text-gray-300">Pitch:</span>
+      <select aria-label="Pitch view"
+              class="bg-gray-700 text-white rounded px-2 py-1 font-semibold"
+              [value]="pitchView()"
+              (change)="setPitchView($any($event.target).value)">
+        <option value="full">Full Horizontal</option>
+        <option value="half-left">Half Pitch (Left)</option>
+        <option value="half-right">Half Pitch (Right)</option>
+        <option value="vertical">Full Vertical</option>
+      </select>
+
+      <div class="inline-flex items-center rounded bg-gray-700 overflow-hidden" role="group" aria-label="Board zoom controls">
+        <button type="button" (click)="stepBoardZoom(-1)"
+                class="px-1.5 py-1 hover:bg-gray-600 font-bold"
+                title="Zoom out" aria-label="Zoom out">−</button>
+        <select aria-label="Board zoom"
+                class="bg-gray-700 text-white px-1.5 py-1 font-semibold border-x border-gray-600"
+                title="Board zoom level (up to 200%)"
+                [value]="boardZoom()"
+                (change)="setBoardZoom(+$any($event.target).value)">
+          <option value="0.7">70%</option>
+          <option value="0.8">80%</option>
+          <option value="0.9">90% (Fit)</option>
+          <option value="1">100%</option>
+          <option value="1.15">115%</option>
+          <option value="1.3">130%</option>
+          <option value="1.5">150%</option>
+          <option value="1.75">175%</option>
+          <option value="2">200%</option>
+        </select>
+        <button type="button" (click)="stepBoardZoom(1)"
+                class="px-1.5 py-1 hover:bg-gray-600 font-bold"
+                title="Zoom in" aria-label="Zoom in">+</button>
+      </div>
+
+      <label class="inline-flex items-center gap-1 cursor-pointer ml-1">
+        <input type="checkbox" [checked]="showStripes()" (change)="toggleStripes()" />
+        Stripes
+      </label>
+      <label class="inline-flex items-center gap-1 cursor-pointer ml-1">
+        <input type="checkbox" [checked]="showMarkings()" (change)="toggleMarkings()" />
+        Lines
+      </label>
+    </div>
+
+    <span class="text-gray-600">|</span>
+
+    <!-- Drawing Color & Thickness -->
+    <div class="flex items-center gap-1.5">
+      <span class="font-bold text-gray-300">Ink:</span>
+      @for (c of drawingColors; track c.hex) {
+        <button type="button" (click)="drawColor.set(c.hex)"
+                class="w-4 h-4 rounded-full border transition-transform"
+                [style.background]="c.hex"
+                [class.scale-125]="drawColor() === c.hex"
+                [class.border-white]="drawColor() === c.hex"
+                [class.border-gray-600]="drawColor() !== c.hex"
+                [title]="c.name"></button>
+      }
+      <select aria-label="Stroke thickness"
+              class="bg-gray-700 text-white rounded px-1.5 py-0.5 ml-1"
+              [value]="drawWidth()"
+              (change)="drawWidth.set(+$any($event.target).value)">
+        <option [value]="2.5">Thin</option>
+        <option [value]="4">Med</option>
+        <option [value]="6.5">Thick</option>
+      </select>
+    </div>
+
+    @if (activeTool() === 'text') {
+      <div class="flex items-center gap-1.5">
+        <input type="text" placeholder="Label text (then click pitch)..."
+               class="bg-gray-900 text-white px-2 py-1 rounded border border-indigo-500 w-44"
+               [value]="pendingText()"
+               (input)="pendingText.set($any($event.target).value)" />
+        <select aria-label="Text size"
+                class="bg-gray-700 text-white rounded px-1.5 py-1"
+                [value]="textSize()"
+                (change)="textSize.set(+$any($event.target).value)">
+          <option [value]="14">S</option>
+          <option [value]="18">M</option>
+          <option [value]="24">L</option>
+        </select>
+      </div>
+    }
+
+    <button type="button" (click)="showEquipmentTray.set(!showEquipmentTray())"
+            class="ml-auto px-2.5 py-1 font-bold rounded transition-colors"
+            [class.bg-amber-600]="showEquipmentTray()"
+            [class.bg-gray-700]="!showEquipmentTray()">
+      {{ showEquipmentTray() ? 'Hide Equipment & Bench' : '+ Equipment & Bench' }}
+    </button>
+  </fieldset>
+
+  <!-- Drag-and-Drop & Clickable Equipment & Squad Palette -->
+  @if (showEquipmentTray()) {
+    <app-equipment-palette
+      [equipmentCatalog]="equipmentCatalog"
+      (paletteDragStart)="onPaletteDragStart($event.event, $event.payload)"
+      (spawnSquad)="spawnSquadToken($event.type, undefined, $event.label, $event.name)"
+      (spawnEquipment)="spawnEquipment($event.kind, $event.defaultColor)"
+      (clearPitch)="clearPitchForDrill(false)" />
+  }
+
+  <!-- Selected Token / Equipment Inspector Bar -->
+  <app-token-inspector
+    [entity]="selectedEntity()"
+    (updateMeta)="updateSelectedMeta($event)"
+    (removeEntity)="deleteSelectedEntity()"
+    (closeInspector)="selectedEntityId.set(null)" />
+
+  <!-- Collapsible Collections Library Modal/Drawer -->
+  @if (showCollections()) {
+    <app-collections-drawer
+      [collections]="collections()"
+      [title]="collectionTitle()"
+      [category]="collectionCategory()"
+      (titleChange)="collectionTitle.set($event)"
+      (categoryChange)="collectionCategory.set($event)"
+      (saveCurrent)="addCurrentToCollections()"
+      (exportJson)="exportJsonFile()"
+      (importJson)="importJsonFile($event)"
+      (loadItem)="loadFromCollection($event)"
+      (removeItem)="removeFromCollection($event)"
+      (closeDrawer)="showCollections.set(false)" />
+  }
+
+  <!-- The Canvas Container -->
+  <div class="bg-[#2e7d32] shadow-2xl overflow-hidden rounded-md touch-none select-none mx-auto w-full"
+       [style.aspect-ratio]="containerAspect()"
+       [style.max-width]="containerMaxWidth()"
+       (dragover)="onCanvasDragOver($event)"
+       (drop)="onCanvasDrop($event)"
+       #canvasContainer></div>
+
+  <!-- Timeline & Export Bar -->
+  <app-timeline-bar
+    [isPlaying]="isPlaying()"
+    [isExporting]="isExporting()"
+    [exportKind]="exportKind()"
+    [exportProgress]="exportProgress()"
+    [frameCount]="store.frameCount()"
+    [currentFrame]="store.currentFrame()"
+    [scrubPos]="scrubPos()"
+    [stepDurationMs]="store.stepDurationMs()"
+    [loopPlayback]="loopPlayback()"
+    [showGhost]="showGhost()"
+    [note]="store.note()"
+    (play)="play()"
+    (stop)="stopPlayback()"
+    (playStep)="playSingleStep()"
+    (goToFrame)="store.goToFrame($event)"
+    (addFrame)="store.addFrame()"
+    (duplicateFrame)="store.duplicateFrame()"
+    (deleteFrame)="deleteFrame()"
+    (exportPng)="exportPng()"
+    (exportGif)="exportGif()"
+    (exportMp4)="exportMp4()"
+    (scrubInput)="onScrub($event)"
+    (scrubEnd)="onScrubEnd()"
+    (stepDurationChange)="store.setStepDuration($event)"
+    (loopPlaybackChange)="loopPlayback.set($event)"
+    (showGhostChange)="showGhost.set($event)"
+    (noteChange)="store.updateFrameNote($event)" />
+</div>

@@ -8,9 +8,18 @@ description: Architecture, conventions and workflow for developing Tactical Boar
 Stack: Angular 22 (standalone, signals, OnPush), `@ngrx/signals`, Konva 10 (outside Angular zone), Tailwind v3, `@ffmpeg/core` 0.12.
 
 ## Layout
-- `src/app/pitch-board/board.store.ts`: **single source of truth**. `frames[]` (entities + arrows per frame), `currentFrame`, `stepDurationMs`, undo/redo history, save/load (`localStorage` key `tactical-board:v1`).
-- `src/app/pitch-board/pitch-board.component.ts`: Konva stage, layers, drawing engine, playback, scrub, MP4 export, toolbar template.
-- Layers (bottom to top): `pitchLayer`, `divisionsLayer`, `ghostLayer`, `drawingLayer`, `entityLayer`.
+- `src/app/pitch-board/models/tactical-board.models.ts`: TypeScript domain interfaces (`TacticalEntity`, `TacticalArrow`, `TacticalShape`, `TacticalText`, `Snapshot`), pitch dimensions (`1050x680`, goal mouth, outer apron), color presets, zoom levels, and SVG cursors.
+- `src/app/pitch-board/board.store.ts` & `src/app/pitch-board/state/board-sanitizer.ts`: **single source of truth**. `frames[]` (entities + arrows + shapes + texts + note per frame), `currentFrame`, `stepDurationMs`, `squadPreset`, undo/redo history, and `sanitizeFrame()` JSON validation.
+- `src/app/pitch-board/board-storage.ts`: `localStorage` Collections library (`tactical-board:collections:v1`) and `#scheme=` base64url URL hash codec.
+- `src/app/pitch-board/formations.data.ts` & `src/app/pitch-board/demo-tactics.data.ts`: 7 11v11 formations, 5 squad presets (`11v11`, `9v9`, `7v7`, `5v5`, `empty`), 6 interactive tour steps, and 3 animated demo tactics.
+- `src/app/pitch-board/canvas/`:
+  - `pitch-renderer.ts`: stadium apron, mowed grass stripes, markings, protruding woven goal nets, 18-zone pitch divisions, classic football, and `"⚽ GOAL!"` banner.
+  - `arrow-renderer.ts`: `computeArrowPath` (straight, quadratic Bézier curves, wavy dribbles, Target Zone trimming), `computeTBarPoints` (`Block ┬`), zone shapes, and ghost trails.
+  - `entity-renderer.ts`: `syncEntityNodes` (players, balls, referees, equipment, vision cones, upright numbers/names) and `renderTextsOnLayer` (coaching note banner + draggable text labels).
+  - `equipment-renderer.ts`: 9 vector training equipment shapes and catalog.
+- `src/app/pitch-board/services/board-export.service.ts`: Injectable Angular service for `2x` PNG, animated GIF, and `1280x720` H.264 MP4 export via `FFmpeg.wasm`.
+- `src/app/pitch-board/pitch-board.component.ts` + `.html` & `src/app/pitch-board/components/`: Main board orchestrator and 5 focused standalone UI sub-components (`TourDemosPanelComponent`, `EquipmentPaletteComponent`, `TokenInspectorComponent`, `CollectionsDrawerComponent`, `TimelineBarComponent`).
+- Layers (bottom to top): `pitchLayer`, `divisionsLayer`, `shapesLayer`, `ghostLayer`, `drawingLayer`, `entityLayer`.
 
 ## Rules
 1. State changes go through the store; Konva nodes are synced from it by an `effect()` (`syncFromStore`). Never mutate Konva as the source of truth, except transient tweens during playback/scrub/export (the store updates when playback stops).

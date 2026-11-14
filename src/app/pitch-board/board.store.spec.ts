@@ -3,6 +3,7 @@ import { BoardStore } from './board.store';
 import { getFormationEntities } from './formations.data';
 import { encodeSchemeHash, decodeSchemeHash } from './board-storage';
 import { DEMO_TACTICS, TOUR_STEPS } from './demo-tactics.data';
+import { computeArrowPath, computeTBarPoints } from './canvas/arrow-renderer';
 
 describe('BoardStore & Tactical Features', () => {
   let store: InstanceType<typeof BoardStore>;
@@ -133,5 +134,19 @@ describe('BoardStore & Tactical Features', () => {
     expect(store.squadPreset()).toBe('empty');
     expect(store.frameCount()).toBe(3);
     expect(store.entities().length).toBe(10);
+  });
+
+  it('should compute straight, curved, wavy dribble, and block T-bar arrow geometry', () => {
+    const straight = computeArrowPath([100, 100, 300, 100], 'pass');
+    expect(straight).toEqual([100, 100, 300, 100]);
+
+    const curved = computeArrowPath([100, 100, 300, 100], 'run', [200, 50]);
+    expect(curved.length).toBeGreaterThan(4);
+
+    const dribble = computeArrowPath([100, 100, 300, 100], 'dribble');
+    expect(dribble.length).toBeGreaterThan(20);
+
+    const tbar = computeTBarPoints([100, 100, 200, 100]);
+    expect(tbar).toEqual([200, 86, 200, 114]);
   });
 });

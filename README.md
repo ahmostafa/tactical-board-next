@@ -136,14 +136,19 @@ Export your tactical board or animation without any server or watermark:
 
 ## Architecture Notes
 
-- `BoardStore` (`src/app/pitch-board/board.store.ts`) is the single source of truth. An Angular `effect()` synchronizes Konva nodes from store state whenever the active frame, entities, arrows, shapes, or texts change.
-- Konva uses six dedicated layers for clean separation of concerns:
-  1. `pitchLayer` — mowed grass stripes, pitch markings, penalty boxes/arcs, and 3D goal nets
+The codebase follows a pragmatic, human-readable Angular feature structure under `src/app/pitch-board/`:
+
+- **`models/tactical-board.models.ts`:** Domain interfaces (`TacticalEntity`, `TacticalArrow`, `TacticalShape`, `TacticalText`, `Snapshot`), pitch dimensions (`1050×680`, goal mouth, stadium apron), color presets, zoom levels, and SVG cursors.
+- **`board.store.ts` & `state/board-sanitizer.ts`:** `BoardStore` (`@ngrx/signals`) is the single source of truth for timeline frames, squad modes, formations, team colors, and per-frame undo/redo stacks, backed by `sanitizeFrame()` for safe JSON/URL import.
+- **`canvas/` (`pitch-renderer.ts`, `arrow-renderer.ts`, `entity-renderer.ts`, plus `equipment-renderer.ts`):** Pure, modular Konva rendering functions and geometry math (`computeArrowPath`, `computeTBarPoints`) separated across six Konva layers:
+  1. `pitchLayer` — outer stadium apron, mowed grass stripes, pitch markings, penalty boxes/arcs, and protruding woven 3D goal nets
   2. `divisionsLayer` — analytical thirds, channels, and half-space highlights
   3. `shapesLayer` — tactical rectangle, ellipse, and triangle zone overlays
   4. `ghostLayer` — previous-frame faded tokens and dashed movement trails
-  5. `drawingLayer` — `Pass`, `Run`, `Dribble`, `Target Zone`, `Block ┬`, and `Freehand` arrows + curve handles + on-pitch text labels
-  6. `entityLayer` — draggable player tokens (with nameplates & vision cones), referees, match balls, and 8 vector training equipment types
+  5. `drawingLayer` — `Pass`, `Run`, `Dribble`, `Target Zone`, `Block ┬`, and `Freehand` arrows + curve handles + on-pitch text labels + `"⚽ GOAL!"` celebration banner
+  6. `entityLayer` — draggable player tokens (with upright numbers, nameplates & vision cones), referees, match balls, and 9 vector training equipment types
+- **`services/board-export.service.ts`:** Injectable Angular service encapsulating `2x` PNG, animated GIF, and `1280×720` H.264 MP4 video encoding via `FFmpeg.wasm`.
+- **`pitch-board.component.ts` + `.html` & `components/`:** Clean orchestrator paired with focused standalone sub-components (`TourDemosPanelComponent`, `EquipmentPaletteComponent`, `TokenInspectorComponent`, `CollectionsDrawerComponent`, and `TimelineBarComponent`).
 
 ## Getting Started
 

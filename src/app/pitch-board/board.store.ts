@@ -1,73 +1,32 @@
 import { computed } from '@angular/core';
 import { patchState, signalStore, withComputed, withMethods, withState } from '@ngrx/signals';
-import { FormationName, getFormationEntities, getSquadPresetEntities, SquadPreset } from './formations.data';
+import {
+  ArrowStyle,
+  EquipmentKind,
+  FormationName,
+  ShapeKind,
+  Snapshot,
+  SquadPreset,
+  TacticalArrow,
+  TacticalEntity,
+  TacticalShape,
+  TacticalText,
+} from './models/tactical-board.models';
+import { getFormationEntities, getSquadPresetEntities } from './formations.data';
+import { isNum, sanitizeFrame } from './state/board-sanitizer';
 
-export type EquipmentKind =
-  | 'cone'
-  | 'disc'
-  | 'donut'
-  | 'hurdle'
-  | 'ladder'
-  | 'pole'
-  | 'mannequin'
-  | 'ring'
-  | 'minigoal'
-  | 'goalnet';
-
-export interface TacticalEntity {
-  id: string;
-  type: 'home' | 'away' | 'ball' | 'referee' | 'equipment';
-  x: number;
-  y: number;
-  label?: string;
-  name?: string;
-  color?: string;
-  facing?: number;
-  showVision?: boolean;
-  equipmentKind?: EquipmentKind;
-  rotation?: number;
-}
-
-export type ArrowStyle = 'pass' | 'run' | 'dribble' | 'zone' | 'block' | 'freehand';
-
-export interface TacticalArrow {
-  id: string;
-  points: [number, number, number, number];
-  style?: ArrowStyle;
-  controlPoint?: [number, number];
-  color?: string;
-  strokeWidth?: number;
-  pathPoints?: number[];
-}
-
-export type ShapeKind = 'rect' | 'ellipse' | 'triangle';
-
-export interface TacticalShape {
-  id: string;
-  kind: ShapeKind;
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
-  color: string;
-}
-
-export interface TacticalText {
-  id: string;
-  x: number;
-  y: number;
-  text: string;
-  fontSize: number;
-  color: string;
-}
-
-export interface Snapshot {
-  entities: TacticalEntity[];
-  arrows: TacticalArrow[];
-  shapes?: TacticalShape[];
-  texts?: TacticalText[];
-  note?: string;
-}
+export type {
+  ArrowStyle,
+  EquipmentKind,
+  FormationName,
+  ShapeKind,
+  Snapshot,
+  SquadPreset,
+  TacticalArrow,
+  TacticalEntity,
+  TacticalShape,
+  TacticalText,
+};
 
 const MAX_HISTORY = 100;
 
@@ -148,85 +107,7 @@ const showFrame = (frames: Snapshot[], index: number): Partial<State> => ({
   future: [],
 });
 
-const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 const clampStep = (ms: number) => Math.min(MAX_STEP_MS, Math.max(MIN_STEP_MS, Math.round(ms)));
-
-const isArrowStyle = (v: unknown): v is ArrowStyle =>
-  v === 'pass' || v === 'run' || v === 'dribble' || v === 'zone' || v === 'block' || v === 'freehand';
-
-const isShapeKind = (v: unknown): v is ShapeKind =>
-  v === 'rect' || v === 'ellipse' || v === 'triangle';
-
-const isEntityType = (v: unknown): v is TacticalEntity['type'] =>
-  v === 'home' || v === 'away' || v === 'ball' || v === 'referee' || v === 'equipment';
-
-/** Rebuilds a frame from untrusted data, keeping known players, custom tokens/equipment, arrows, shapes and texts. */
-const sanitizeFrame = (raw: any): Snapshot => {
-  const defaultById = new Map(INITIAL_ENTITIES.map((e) => [e.id, e]));
-  const entities: TacticalEntity[] = Array.isArray(raw?.entities)
-    ? raw.entities
-        .map((e: any): TacticalEntity | null => {
-          if (typeof e?.id !== 'string' || !isNum(e.x) || !isNum(e.y)) return null;
-          const fallback = defaultById.get(e.id);
-          const type = isEntityType(e.type) ? e.type : fallback?.type;
-          if (!type) return null;
-          return {
-            ...(fallback ?? {}),
-            id: e.id,
-            type,
-            x: e.x,
-            y: e.y,
-            ...(typeof e.label === 'string' ? { label: e.label.slice(0, 4) } : {}),
-            ...(typeof e.name === 'string' ? { name: e.name.slice(0, 24) } : {}),
-            ...(typeof e.color === 'string' ? { color: e.color } : {}),
-            ...(isNum(e.facing) ? { facing: e.facing } : {}),
-            ...(typeof e.showVision === 'boolean' ? { showVision: e.showVision } : {}),
-            ...(typeof e.equipmentKind === 'string' ? { equipmentKind: e.equipmentKind as EquipmentKind } : {}),
-            ...(isNum(e.rotation) ? { rotation: e.rotation } : {}),
-          };
-        })
-        .filter((e: TacticalEntity | null): e is TacticalEntity => e !== null)
-    : INITIAL_ENTITIES;
-
-  return {
-    entities,
-    arrows: (Array.isArray(raw?.arrows) ? raw.arrows : [])
-      .filter((a: any) => typeof a?.id === 'string' && Array.isArray(a.points) && a.points.length === 4 && a.points.every(isNum))
-      .map((a: any): TacticalArrow => ({
-        id: a.id,
-        points: [a.points[0], a.points[1], a.points[2], a.points[3]],
-        style: isArrowStyle(a.style) ? a.style : 'pass',
-        ...(Array.isArray(a.controlPoint) && a.controlPoint.length === 2 && a.controlPoint.every(isNum)
-          ? { controlPoint: [a.controlPoint[0], a.controlPoint[1]] }
-          : {}),
-        ...(typeof a.color === 'string' ? { color: a.color } : {}),
-        ...(isNum(a.strokeWidth) ? { strokeWidth: a.strokeWidth } : {}),
-        ...(Array.isArray(a.pathPoints) && a.pathPoints.every(isNum) ? { pathPoints: a.pathPoints } : {}),
-      })),
-    shapes: (Array.isArray(raw?.shapes) ? raw.shapes : [])
-      .filter((s: any) => typeof s?.id === 'string' && isShapeKind(s.kind) && isNum(s.x1) && isNum(s.y1) && isNum(s.x2) && isNum(s.y2))
-      .map((s: any): TacticalShape => ({
-        id: s.id,
-        kind: s.kind,
-        x1: s.x1,
-        y1: s.y1,
-        x2: s.x2,
-        y2: s.y2,
-        color: typeof s.color === 'string' ? s.color : '#fbbf24',
-      })),
-    texts: (Array.isArray(raw?.texts) ? raw.texts : [])
-      .filter((t: any) => typeof t?.id === 'string' && isNum(t.x) && isNum(t.y) && typeof t.text === 'string')
-      .map((t: any): TacticalText => ({
-        id: t.id,
-        x: t.x,
-        y: t.y,
-        text: t.text.slice(0, 80),
-        fontSize: isNum(t.fontSize) ? t.fontSize : 18,
-        color: typeof t.color === 'string' ? t.color : '#ffffff',
-      })),
-    note: typeof raw?.note === 'string' ? raw.note.slice(0, 140) : '',
-  };
-};
 
 export const BoardStore = signalStore(
   { providedIn: 'root' },
@@ -515,7 +396,7 @@ export const BoardStore = signalStore(
     importBoard(data: any): boolean {
       if (typeof data !== 'object' || data === null) return false;
       const rawFrames = Array.isArray(data.frames) && data.frames.length ? data.frames.slice(0, MAX_FRAMES) : [data];
-      const frames = rawFrames.map(sanitizeFrame);
+      const frames = rawFrames.map((f: any) => sanitizeFrame(f, INITIAL_ENTITIES));
       const index = isNum(data.currentFrame)
         ? Math.min(frames.length - 1, Math.max(0, Math.floor(data.currentFrame)))
         : 0;
