@@ -1,130 +1,523 @@
-import { Component, ElementRef, ViewChild, AfterViewInit, OnDestroy, NgZone, ChangeDetectionStrategy, inject, signal, effect, computed, HostListener } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  ViewChild,
+  AfterViewInit,
+  OnDestroy,
+  NgZone,
+  ChangeDetectionStrategy,
+  inject,
+  signal,
+  effect,
+  computed,
+  HostListener,
+} from '@angular/core';
 import Konva from 'konva';
-import { BoardStore, TacticalEntity, TacticalArrow, ArrowStyle } from './board.store';
+import {
+  BoardStore,
+  TacticalEntity,
+  TacticalArrow,
+  ArrowStyle,
+  ShapeKind,
+  TacticalShape,
+  TacticalText,
+  EquipmentKind,
+} from './board.store';
+import { FORMATION_NAMES, FormationName } from './formations.data';
+import { EQUIPMENT_CATALOG, renderEquipmentShape } from './equipment-renderer';
+import {
+  SavedCollectionItem,
+  loadCollections,
+  saveToCollections,
+  deleteFromCollections,
+  encodeSchemeHash,
+  decodeSchemeHash,
+} from './board-storage';
 
 const STORAGE_KEY = 'tactical-board:v1';
+
+export type PitchViewMode = 'full' | 'half-left' | 'half-right' | 'vertical';
+export type ActiveToolMode = 'move' | 'arrow' | 'shape' | 'text' | 'eraser';
+
+export const TEAM_COLOR_PRESETS = [
+  { name: 'Red', hex: '#e74c3c' },
+  { name: 'Blue', hex: '#3498db' },
+  { name: 'Yellow', hex: '#eab308' },
+  { name: 'Emerald', hex: '#10b981' },
+  { name: 'Purple', hex: '#8b5cf6' },
+  { name: 'Orange', hex: '#f97316' },
+  { name: 'Cyan', hex: '#06b6d4' },
+  { name: 'White', hex: '#f3f4f6' },
+  { name: 'Black', hex: '#1f2937' },
+  { name: 'Pink', hex: '#ec4899' },
+];
+
+export const DRAWING_COLORS = [
+  { name: 'Amber', hex: '#f1c40f' },
+  { name: 'White', hex: '#ffffff' },
+  { name: 'Red', hex: '#ef4444' },
+  { name: 'Cyan', hex: '#38bdf8' },
+  { name: 'Green', hex: '#4ade80' },
+  { name: 'Orange', hex: '#fb923c' },
+  { name: 'Pink', hex: '#f472b6' },
+];
 
 @Component({
   selector: 'app-pitch-board',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="w-full max-w-5xl mx-auto p-4">
-      <!-- Toolbar -->
-      <fieldset class="flex flex-wrap gap-4 mb-4 border-0 p-0 m-0 min-w-0" [disabled]="isPlaying() || isExporting()">
+    <div class="w-full max-w-6xl mx-auto p-3 text-white">
+      <!-- Row 1: Primary Drawing, Arrow Styles, Overlays, History & File Controls -->
+      <fieldset class="flex flex-wrap items-center gap-2 mb-2 border-0 p-0 m-0 min-w-0" [disabled]="isPlaying() || isExporting()">
         <button (click)="toggleDrawingMode()"
-                class="px-4 py-2 text-white font-bold rounded shadow-md transition-colors"
+                class="px-3 py-1.5 text-sm text-white font-bold rounded shadow-md transition-colors"
                 [class.bg-blue-600]="!isDrawingMode()"
                 [class.bg-red-600]="isDrawingMode()">
           {{ isDrawingMode() ? 'Stop Drawing (Back to Dragging)' : 'Draw Tactical Arrows' }}
         </button>
+
+        <!-- Line & Arrow Styles -->
         <div class="inline-flex rounded shadow-md overflow-hidden" role="group" aria-label="Arrow style">
           <button (click)="selectArrowStyle('pass')"
-                  class="px-3 py-2 text-xs font-bold text-white transition-colors"
-                  [class.bg-amber-600]="arrowStyle() === 'pass'"
-                  [class.bg-gray-700]="arrowStyle() !== 'pass'"
+                  class="px-2.5 py-1.5 text-xs font-bold text-white transition-colors"
+                  [class.bg-amber-600]="activeTool() === 'arrow' && arrowStyle() === 'pass'"
+                  [class.bg-gray-700]="!(activeTool() === 'arrow' && arrowStyle() === 'pass')"
                   title="Solid arrow for passes">Pass</button>
           <button (click)="selectArrowStyle('run')"
-                  class="px-3 py-2 text-xs font-bold text-white border-l border-gray-600 transition-colors"
-                  [class.bg-amber-600]="arrowStyle() === 'run'"
-                  [class.bg-gray-700]="arrowStyle() !== 'run'"
+                  class="px-2.5 py-1.5 text-xs font-bold text-white border-l border-gray-600 transition-colors"
+                  [class.bg-amber-600]="activeTool() === 'arrow' && arrowStyle() === 'run'"
+                  [class.bg-gray-700]="!(activeTool() === 'arrow' && arrowStyle() === 'run')"
                   title="Dashed arrow for off-the-ball runs">Run</button>
           <button (click)="selectArrowStyle('dribble')"
-                  class="px-3 py-2 text-xs font-bold text-white border-l border-gray-600 transition-colors"
-                  [class.bg-amber-600]="arrowStyle() === 'dribble'"
-                  [class.bg-gray-700]="arrowStyle() !== 'dribble'"
+                  class="px-2.5 py-1.5 text-xs font-bold text-white border-l border-gray-600 transition-colors"
+                  [class.bg-amber-600]="activeTool() === 'arrow' && arrowStyle() === 'dribble'"
+                  [class.bg-gray-700]="!(activeTool() === 'arrow' && arrowStyle() === 'dribble')"
                   title="Wavy arrow for ball carrier dribbles">Dribble</button>
           <button (click)="selectArrowStyle('zone')"
-                  class="px-3 py-2 text-xs font-bold text-white border-l border-gray-600 transition-colors"
-                  [class.bg-amber-600]="arrowStyle() === 'zone'"
-                  [class.bg-gray-700]="arrowStyle() !== 'zone'"
+                  class="px-2.5 py-1.5 text-xs font-bold text-white border-l border-gray-600 transition-colors"
+                  [class.bg-amber-600]="activeTool() === 'arrow' && arrowStyle() === 'zone'"
+                  [class.bg-gray-700]="!(activeTool() === 'arrow' && arrowStyle() === 'zone')"
                   title="Arrow pointing into a highlighted empty space / target zone">Target Zone</button>
+          <button (click)="selectArrowStyle('block')"
+                  class="px-2.5 py-1.5 text-xs font-bold text-white border-l border-gray-600 transition-colors"
+                  [class.bg-amber-600]="activeTool() === 'arrow' && arrowStyle() === 'block'"
+                  [class.bg-gray-700]="!(activeTool() === 'arrow' && arrowStyle() === 'block')"
+                  title="Defensive block / screen line with perpendicular T-bar cap">Block ┬</button>
+          <button (click)="selectArrowStyle('freehand')"
+                  class="px-2.5 py-1.5 text-xs font-bold text-white border-l border-gray-600 transition-colors"
+                  [class.bg-amber-600]="activeTool() === 'arrow' && arrowStyle() === 'freehand'"
+                  [class.bg-gray-700]="!(activeTool() === 'arrow' && arrowStyle() === 'freehand')"
+                  title="Freehand pencil sketch">Freehand</button>
         </div>
+
+        <!-- Shapes, Text & Eraser -->
+        <div class="inline-flex rounded shadow-md overflow-hidden" role="group" aria-label="Shapes and annotation tools">
+          <button (click)="selectShapeTool('rect')"
+                  class="px-2.5 py-1.5 text-xs font-bold text-white transition-colors"
+                  [class.bg-indigo-600]="activeTool() === 'shape' && shapeKind() === 'rect'"
+                  [class.bg-gray-700]="!(activeTool() === 'shape' && shapeKind() === 'rect')"
+                  title="Draw rectangular tactical zone">Rect Zone</button>
+          <button (click)="selectShapeTool('ellipse')"
+                  class="px-2.5 py-1.5 text-xs font-bold text-white border-l border-gray-600 transition-colors"
+                  [class.bg-indigo-600]="activeTool() === 'shape' && shapeKind() === 'ellipse'"
+                  [class.bg-gray-700]="!(activeTool() === 'shape' && shapeKind() === 'ellipse')"
+                  title="Draw circular/elliptical pressing zone">Circle Zone</button>
+          <button (click)="selectShapeTool('triangle')"
+                  class="px-2.5 py-1.5 text-xs font-bold text-white border-l border-gray-600 transition-colors"
+                  [class.bg-indigo-600]="activeTool() === 'shape' && shapeKind() === 'triangle'"
+                  [class.bg-gray-700]="!(activeTool() === 'shape' && shapeKind() === 'triangle')"
+                  title="Draw triangular pressing trap / cover shadow">Triangle</button>
+          <button (click)="selectTextTool()"
+                  class="px-2.5 py-1.5 text-xs font-bold text-white border-l border-gray-600 transition-colors"
+                  [class.bg-indigo-600]="activeTool() === 'text'"
+                  [class.bg-gray-700]="activeTool() !== 'text'"
+                  title="Click on pitch to place a draggable text label">Text</button>
+          <button (click)="selectEraserTool()"
+                  class="px-2.5 py-1.5 text-xs font-bold text-white border-l border-gray-600 transition-colors"
+                  [class.bg-rose-600]="activeTool() === 'eraser'"
+                  [class.bg-gray-700]="activeTool() !== 'eraser'"
+                  title="Click any arrow, zone, text, or equipment item to delete it">Eraser</button>
+        </div>
+
         <button (click)="toggleDivisions()"
-                class="px-4 py-2 text-white font-bold rounded shadow-md transition-colors"
+                class="px-3 py-1.5 text-xs text-white font-bold rounded shadow-md transition-colors"
                 [class.bg-gray-700]="!showDivisions()"
                 [class.bg-emerald-600]="showDivisions()">
           Pitch Divisions
         </button>
+
         <button (click)="store.undo()" [disabled]="!store.canUndo()"
-                class="px-4 py-2 bg-gray-700 text-white font-bold rounded shadow-md disabled:opacity-40">Undo</button>
+                class="px-3 py-1.5 text-xs bg-gray-700 text-white font-bold rounded shadow-md disabled:opacity-40">Undo</button>
         <button (click)="store.redo()" [disabled]="!store.canRedo()"
-                class="px-4 py-2 bg-gray-700 text-white font-bold rounded shadow-md disabled:opacity-40">Redo</button>
+                class="px-3 py-1.5 text-xs bg-gray-700 text-white font-bold rounded shadow-md disabled:opacity-40">Redo</button>
         <button (click)="store.clearArrows()" [disabled]="!store.hasArrows()"
-                class="px-4 py-2 bg-gray-700 text-white font-bold rounded shadow-md disabled:opacity-40">Clear Arrows</button>
+                class="px-3 py-1.5 text-xs bg-gray-700 text-white font-bold rounded shadow-md disabled:opacity-40">Clear Arrows</button>
         <button (click)="saveBoard()"
-                class="px-4 py-2 bg-emerald-700 text-white font-bold rounded shadow-md">Save</button>
+                class="px-3 py-1.5 text-xs bg-emerald-700 text-white font-bold rounded shadow-md">Save</button>
         <button (click)="loadBoard()" [disabled]="!hasSavedBoard()"
-                class="px-4 py-2 bg-emerald-700 text-white font-bold rounded shadow-md disabled:opacity-40">Load</button>
+                class="px-3 py-1.5 text-xs bg-emerald-700 text-white font-bold rounded shadow-md disabled:opacity-40">Load</button>
+        <button (click)="showCollections.set(!showCollections())"
+                class="px-3 py-1.5 text-xs font-bold rounded shadow-md transition-colors"
+                [class.bg-teal-600]="showCollections()"
+                [class.bg-gray-700]="!showCollections()"
+                title="Open multi-board Collections library and JSON import/export">
+          Collections ({{ collections().length }})
+        </button>
+        <button (click)="shareSchemeLink()"
+                class="px-3 py-1.5 text-xs bg-sky-700 hover:bg-sky-600 text-white font-bold rounded shadow-md"
+                title="Copy a shareable link encoding the entire board and animation">Share Link</button>
         <button (click)="resetBoard()"
-                class="px-4 py-2 bg-gray-700 text-white font-bold rounded shadow-md">Reset</button>
+                class="px-3 py-1.5 text-xs bg-gray-700 text-white font-bold rounded shadow-md">Reset</button>
         @if (statusMessage()) {
-          <span class="self-center text-sm text-gray-300">{{ statusMessage() }}</span>
+          <span class="self-center text-xs text-amber-300 font-semibold">{{ statusMessage() }}</span>
         }
       </fieldset>
 
-      <!-- The Canvas Container -->
-      <div class="aspect-[105/68] bg-[#2e7d32] shadow-2xl overflow-hidden rounded-md touch-none select-none" #canvasContainer></div>
+      <!-- Row 2: Formations, Team Colors, Pitch Views, Drawing Palette & Equipment Toggle -->
+      <fieldset class="flex flex-wrap items-center gap-3 mb-2 px-3 py-2 rounded bg-gray-800/90 text-xs border-0 m-0 min-w-0" [disabled]="isPlaying() || isExporting()">
+        <!-- Home Team Formation & Color -->
+        <div class="flex items-center gap-1.5">
+          <span class="inline-block w-3 h-3 rounded-full border border-white/60" [style.background]="store.homeColor()"></span>
+          <span class="font-bold text-gray-200">Home:</span>
+          <select aria-label="Home formation"
+                  class="bg-gray-700 text-white rounded px-2 py-1 font-semibold"
+                  [value]="store.homeFormation()"
+                  (change)="onFormationChange('home', $any($event.target).value)">
+            @for (f of formations; track f) {
+              <option [value]="f">{{ f }}</option>
+            }
+          </select>
+          <input type="color" aria-label="Home team color"
+                 class="w-6 h-6 rounded cursor-pointer bg-transparent border-0"
+                 [value]="store.homeColor()"
+                 (input)="onTeamColorChange('home', $any($event.target).value)" />
+        </div>
 
-      <!-- Timeline -->
-      <div class="mt-4 p-3 rounded-md bg-gray-800 text-white flex flex-col gap-3">
-        <div class="flex flex-wrap items-center gap-3">
+        <!-- Away Team Formation & Color -->
+        <div class="flex items-center gap-1.5">
+          <span class="inline-block w-3 h-3 rounded-full border border-white/60" [style.background]="store.awayColor()"></span>
+          <span class="font-bold text-gray-200">Away:</span>
+          <select aria-label="Away formation"
+                  class="bg-gray-700 text-white rounded px-2 py-1 font-semibold"
+                  [value]="store.awayFormation()"
+                  (change)="onFormationChange('away', $any($event.target).value)">
+            @for (f of formations; track f) {
+              <option [value]="f">{{ f }}</option>
+            }
+          </select>
+          <input type="color" aria-label="Away team color"
+                 class="w-6 h-6 rounded cursor-pointer bg-transparent border-0"
+                 [value]="store.awayColor()"
+                 (input)="onTeamColorChange('away', $any($event.target).value)" />
+        </div>
+
+        <span class="text-gray-600">|</span>
+
+        <!-- Pitch View & Turf Toggles -->
+        <div class="flex items-center gap-1.5">
+          <span class="font-bold text-gray-300">Pitch:</span>
+          <select aria-label="Pitch view"
+                  class="bg-gray-700 text-white rounded px-2 py-1 font-semibold"
+                  [value]="pitchView()"
+                  (change)="setPitchView($any($event.target).value)">
+            <option value="full">Full Horizontal</option>
+            <option value="half-left">Half Pitch (Left)</option>
+            <option value="half-right">Half Pitch (Right)</option>
+            <option value="vertical">Full Vertical</option>
+          </select>
+          <label class="inline-flex items-center gap-1 cursor-pointer ml-1">
+            <input type="checkbox" [checked]="showStripes()" (change)="toggleStripes()" />
+            Stripes
+          </label>
+          <label class="inline-flex items-center gap-1 cursor-pointer ml-1">
+            <input type="checkbox" [checked]="showMarkings()" (change)="toggleMarkings()" />
+            Lines
+          </label>
+        </div>
+
+        <span class="text-gray-600">|</span>
+
+        <!-- Drawing Color & Thickness -->
+        <div class="flex items-center gap-1.5">
+          <span class="font-bold text-gray-300">Ink:</span>
+          @for (c of drawingColors; track c.hex) {
+            <button type="button" (click)="drawColor.set(c.hex)"
+                    class="w-4 h-4 rounded-full border transition-transform"
+                    [style.background]="c.hex"
+                    [class.scale-125]="drawColor() === c.hex"
+                    [class.border-white]="drawColor() === c.hex"
+                    [class.border-gray-600]="drawColor() !== c.hex"
+                    [title]="c.name"></button>
+          }
+          <select aria-label="Stroke thickness"
+                  class="bg-gray-700 text-white rounded px-1.5 py-0.5 ml-1"
+                  [value]="drawWidth()"
+                  (change)="drawWidth.set(+$any($event.target).value)">
+            <option [value]="2.5">Thin</option>
+            <option [value]="4">Med</option>
+            <option [value]="6.5">Thick</option>
+          </select>
+        </div>
+
+        @if (activeTool() === 'text') {
+          <div class="flex items-center gap-1.5">
+            <input type="text" placeholder="Label text (then click pitch)..."
+                   class="bg-gray-900 text-white px-2 py-1 rounded border border-indigo-500 w-44"
+                   [value]="pendingText()"
+                   (input)="pendingText.set($any($event.target).value)" />
+            <select aria-label="Text size"
+                    class="bg-gray-700 text-white rounded px-1.5 py-1"
+                    [value]="textSize()"
+                    (change)="textSize.set(+$any($event.target).value)">
+              <option [value]="14">S</option>
+              <option [value]="18">M</option>
+              <option [value]="24">L</option>
+            </select>
+          </div>
+        }
+
+        <button type="button" (click)="showEquipmentTray.set(!showEquipmentTray())"
+                class="ml-auto px-2.5 py-1 font-bold rounded transition-colors"
+                [class.bg-amber-600]="showEquipmentTray()"
+                [class.bg-gray-700]="!showEquipmentTray()">
+          {{ showEquipmentTray() ? 'Hide Equipment & Bench' : '+ Equipment & Bench' }}
+        </button>
+      </fieldset>
+
+      <!-- Collapsible Equipment & Squad Tray -->
+      @if (showEquipmentTray()) {
+        <div class="flex flex-wrap items-center gap-2 mb-2 px-3 py-2 rounded bg-gray-800/80 border border-gray-700 text-xs">
+          <span class="font-bold text-amber-400">Add to Pitch:</span>
+          <button type="button" (click)="spawnSquadToken('home')"
+                  class="px-2 py-1 bg-red-700 hover:bg-red-600 rounded font-semibold">+ Home Player</button>
+          <button type="button" (click)="spawnSquadToken('away')"
+                  class="px-2 py-1 bg-blue-700 hover:bg-blue-600 rounded font-semibold">+ Away Player</button>
+          <button type="button" (click)="spawnSquadToken('referee')"
+                  class="px-2 py-1 bg-yellow-600 hover:bg-yellow-500 rounded font-semibold">+ Referee</button>
+          <button type="button" (click)="spawnSquadToken('ball')"
+                  class="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded font-semibold">+ Ball</button>
+          <span class="text-gray-600">|</span>
+          @for (item of equipmentCatalog; track item.kind) {
+            <button type="button" (click)="spawnEquipment(item.kind, item.defaultColor)"
+                    class="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded font-semibold">
+              + {{ item.label }}
+            </button>
+          }
+        </div>
+      }
+
+      <!-- Selected Token / Equipment Inspector Bar (shown when a player or equipment is clicked) -->
+      @if (selectedEntity(); as sel) {
+        <div class="flex flex-wrap items-center gap-3 mb-2 px-3 py-2 rounded bg-indigo-950/90 border border-indigo-500/60 text-xs">
+          <span class="font-bold text-indigo-300">
+            Selected: {{ sel.type === 'home' ? 'Home Player' : sel.type === 'away' ? 'Away Player' : sel.type === 'referee' ? 'Referee' : sel.equipmentKind || 'Ball' }}
+          </span>
+
+          @if (sel.type === 'home' || sel.type === 'away' || sel.type === 'referee') {
+            <label class="flex items-center gap-1">
+              Number:
+              <input type="text" maxlength="3"
+                     class="w-12 bg-gray-900 text-white px-1.5 py-0.5 rounded border border-gray-600 text-center font-bold"
+                     [value]="sel.label ?? ''"
+                     (input)="updateSelectedMeta({ label: $any($event.target).value })" />
+            </label>
+            <label class="flex items-center gap-1">
+              Name / Role:
+              <input type="text" maxlength="18" placeholder="e.g. Salah / CDM"
+                     class="w-32 bg-gray-900 text-white px-2 py-0.5 rounded border border-gray-600"
+                     [value]="sel.name ?? ''"
+                     (input)="updateSelectedMeta({ name: $any($event.target).value })" />
+            </label>
+            <label class="flex items-center gap-1 cursor-pointer">
+              <input type="checkbox"
+                     [checked]="!!sel.showVision"
+                     (change)="updateSelectedMeta({ showVision: !sel.showVision, facing: sel.facing ?? (sel.type === 'away' ? 180 : 0) })" />
+              Vision Cone
+            </label>
+            @if (sel.showVision) {
+              <label class="flex items-center gap-1">
+                Facing {{ sel.facing ?? 0 }}°
+                <input type="range" min="0" max="355" step="5" class="w-24"
+                       [value]="sel.facing ?? 0"
+                       (input)="updateSelectedMeta({ facing: +$any($event.target).value })" />
+              </label>
+            }
+          }
+
+          @if (sel.type === 'equipment') {
+            <button type="button"
+                    (click)="updateSelectedMeta({ rotation: ((sel.rotation ?? 0) + 45) % 360 })"
+                    class="px-2 py-0.5 bg-gray-700 hover:bg-gray-600 rounded font-semibold">
+              Rotate 45° ({{ sel.rotation ?? 0 }}°)
+            </button>
+            <input type="color" aria-label="Equipment color"
+                   class="w-6 h-5 rounded cursor-pointer bg-transparent border-0"
+                   [value]="sel.color || '#f97316'"
+                   (input)="updateSelectedMeta({ color: $any($event.target).value })" />
+          }
+
+          @if (sel.id !== 'ball') {
+            <button type="button" (click)="deleteSelectedEntity()"
+                    class="px-2 py-0.5 bg-rose-700 hover:bg-rose-600 rounded font-semibold">
+              Remove from Pitch
+            </button>
+          }
+          <button type="button" (click)="selectedEntityId.set(null)"
+                  class="ml-auto px-2 py-0.5 bg-gray-700 hover:bg-gray-600 rounded">Done</button>
+        </div>
+      }
+
+      <!-- Collapsible Collections Library Modal/Drawer -->
+      @if (showCollections()) {
+        <div class="mb-3 p-3 rounded bg-gray-800 border border-teal-600/60 text-xs flex flex-col gap-2">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="font-bold text-teal-300 text-sm">Tactical Collections Library</span>
+            <input type="text" placeholder="Scheme title (e.g. Arsenal High Press 4-3-3)..."
+                   class="bg-gray-900 text-white px-2.5 py-1 rounded border border-gray-600 w-64"
+                   [value]="collectionTitle()"
+                   (input)="collectionTitle.set($any($event.target).value)" />
+            <select aria-label="Scheme category"
+                    class="bg-gray-700 text-white rounded px-2 py-1"
+                    [value]="collectionCategory()"
+                    (change)="collectionCategory.set($any($event.target).value)">
+              <option value="Match Tactic">Match Tactic</option>
+              <option value="Set Piece">Set Piece</option>
+              <option value="Training Drill">Training Drill</option>
+            </select>
+            <button type="button" (click)="addCurrentToCollections()"
+                    class="px-3 py-1 bg-teal-600 hover:bg-teal-500 font-bold rounded">
+              + Save to Collection
+            </button>
+            <button type="button" (click)="exportJsonFile()"
+                    class="px-2.5 py-1 bg-gray-700 hover:bg-gray-600 font-semibold rounded">
+              Export .JSON
+            </button>
+            <label class="px-2.5 py-1 bg-gray-700 hover:bg-gray-600 font-semibold rounded cursor-pointer">
+              Import .JSON
+              <input type="file" accept=".json,application/json" class="hidden" (change)="importJsonFile($event)" />
+            </label>
+            <button type="button" (click)="showCollections.set(false)"
+                    class="ml-auto px-2 py-1 bg-gray-700 rounded">Close</button>
+          </div>
+          @if (collections().length === 0) {
+            <p class="text-gray-400">No schemes saved in your collection yet. Enter a title above and click "+ Save to Collection".</p>
+          } @else {
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-44 overflow-y-auto pt-1">
+              @for (item of collections(); track item.id) {
+                <div class="flex items-center justify-between gap-2 p-2 rounded bg-gray-900/90 border border-gray-700">
+                  <div class="min-w-0">
+                    <div class="font-bold text-white truncate">{{ item.title }}</div>
+                    <div class="text-[11px] text-gray-400">{{ item.category }} • {{ item.frameCount }} frame(s)</div>
+                  </div>
+                  <div class="flex items-center gap-1 shrink-0">
+                    <button type="button" (click)="loadFromCollection(item)"
+                            class="px-2 py-1 bg-emerald-700 hover:bg-emerald-600 rounded font-bold">Load</button>
+                    <button type="button" (click)="removeFromCollection(item.id)"
+                            class="px-2 py-1 bg-rose-800 hover:bg-rose-700 rounded">✕</button>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      }
+
+      <!-- The Canvas Container -->
+      <div class="bg-[#2e7d32] shadow-2xl overflow-hidden rounded-md touch-none select-none mx-auto transition-all"
+           [class.aspect-\[105\/68\]]="pitchView() !== 'vertical'"
+           [class.aspect-\[68\/105\]]="pitchView() === 'vertical'"
+           [class.max-w-xl]="pitchView() === 'vertical'"
+           #canvasContainer></div>
+
+      <!-- Timeline & Export Bar -->
+      <div class="mt-3 p-3 rounded-md bg-gray-800 text-white flex flex-col gap-3">
+        <div class="flex flex-wrap items-center gap-2">
           <button (click)="isPlaying() ? stopPlayback() : play()"
                   [disabled]="isExporting() || (!isPlaying() && store.frameCount() < 2)"
-                  class="px-4 py-2 font-bold rounded shadow-md disabled:opacity-40"
+                  class="px-4 py-1.5 font-bold rounded shadow-md disabled:opacity-40"
                   [class.bg-blue-600]="!isPlaying()"
                   [class.bg-red-600]="isPlaying()">
             {{ isPlaying() ? 'Stop' : 'Play' }}
           </button>
 
-          <fieldset class="flex flex-wrap items-center gap-2 border-0 p-0 m-0 min-w-0" [disabled]="isPlaying() || isExporting()">
+          <button (click)="playSingleStep()"
+                  [disabled]="isPlaying() || isExporting() || store.frameCount() < 2"
+                  class="px-3 py-1.5 bg-indigo-700 hover:bg-indigo-600 rounded text-xs font-bold disabled:opacity-40"
+                  title="Preview only the current step transition">
+            Play Step
+          </button>
+
+          <fieldset class="flex flex-wrap items-center gap-1.5 border-0 p-0 m-0 min-w-0" [disabled]="isPlaying() || isExporting()">
             <button (click)="store.goToFrame(store.currentFrame() - 1)" [disabled]="store.currentFrame() === 0"
-                    class="px-3 py-2 bg-gray-700 rounded disabled:opacity-40" aria-label="Previous frame">&lt;</button>
+                    class="px-2.5 py-1.5 bg-gray-700 rounded disabled:opacity-40" aria-label="Previous frame">&lt;</button>
             @for (i of frameIndexes(); track i) {
               <button (click)="store.goToFrame(i)"
-                      class="min-w-9 px-3 py-2 rounded font-bold text-sm"
+                      class="min-w-8 px-2.5 py-1.5 rounded font-bold text-xs"
                       [class.bg-emerald-600]="i === store.currentFrame()"
                       [class.bg-gray-700]="i !== store.currentFrame()">{{ i + 1 }}</button>
             }
             <button (click)="store.goToFrame(store.currentFrame() + 1)"
                     [disabled]="store.currentFrame() >= store.frameCount() - 1"
-                    class="px-3 py-2 bg-gray-700 rounded disabled:opacity-40" aria-label="Next frame">&gt;</button>
+                    class="px-2.5 py-1.5 bg-gray-700 rounded disabled:opacity-40" aria-label="Next frame">&gt;</button>
 
-            <button (click)="store.addFrame()" class="px-3 py-2 bg-blue-700 rounded text-sm font-bold"
+            <button (click)="store.addFrame()" class="px-3 py-1.5 bg-blue-700 rounded text-xs font-bold"
                     title="New step with the same positions and no arrows">+ Frame</button>
-            <button (click)="store.duplicateFrame()" class="px-3 py-2 bg-gray-700 rounded text-sm font-bold"
+            <button (click)="store.duplicateFrame()" class="px-3 py-1.5 bg-gray-700 rounded text-xs font-bold"
                     title="Copy this step including its arrows">Duplicate</button>
             <button (click)="deleteFrame()" [disabled]="store.frameCount() < 2"
-                    class="px-3 py-2 bg-gray-700 rounded text-sm font-bold disabled:opacity-40">Delete</button>
+                    class="px-3 py-1.5 bg-gray-700 rounded text-xs font-bold disabled:opacity-40">Delete</button>
+
+            <span class="text-gray-600 mx-1">|</span>
+
+            <button (click)="exportPng()"
+                    class="px-3 py-1.5 bg-sky-700 hover:bg-sky-600 rounded text-xs font-bold"
+                    title="Download high-resolution PNG image of the current board">
+              Export PNG
+            </button>
+            <button (click)="exportGif()" [disabled]="store.frameCount() < 2"
+                    class="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 rounded text-xs font-bold disabled:opacity-40"
+                    title="Render the timeline into a looping animated GIF">
+              {{ isExporting() && exportKind() === 'gif' ? 'GIF (' + exportProgress() + '%)' : 'Export GIF' }}
+            </button>
             <button (click)="exportMp4()" [disabled]="store.frameCount() < 2"
-                    class="px-3 py-2 bg-purple-700 hover:bg-purple-600 rounded text-sm font-bold disabled:opacity-40"
-                    title="Render the timeline into a downloadable MP4 video">
-              {{ isExporting() ? 'Exporting (' + exportProgress() + '%)' : 'Export MP4' }}
+                    class="px-3 py-1.5 bg-purple-700 hover:bg-purple-600 rounded text-xs font-bold disabled:opacity-40"
+                    title="Render the timeline into a downloadable 720p MP4 video">
+              {{ isExporting() && exportKind() === 'mp4' ? 'Exporting (' + exportProgress() + '%)' : 'Export MP4' }}
             </button>
           </fieldset>
         </div>
 
-        <div class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
-          <label class="flex items-center gap-2 grow min-w-48">
+        <div class="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
+          <label class="flex items-center gap-2 grow min-w-44">
             Scrub
             <input type="range" class="w-full" min="0" step="0.01"
                    [max]="store.frameCount() - 1" [value]="scrubPos()"
                    [disabled]="isPlaying() || isExporting() || store.frameCount() < 2"
                    (input)="onScrub($event)" (change)="onScrubEnd()" />
           </label>
-          <label class="flex items-center gap-2">
+          <label class="flex items-center gap-1.5">
             Step {{ (store.stepDurationMs() / 1000).toFixed(1) }}s
             <input type="range" min="300" max="3000" step="100" [value]="store.stepDurationMs()"
                    (input)="store.setStepDuration(+$any($event.target).value)" />
           </label>
-          <label class="flex items-center gap-2">
+          <label class="flex items-center gap-1.5 cursor-pointer">
+            <input type="checkbox" [checked]="loopPlayback()" (change)="loopPlayback.set(!loopPlayback())" />
+            Loop
+          </label>
+          <label class="flex items-center gap-1.5 cursor-pointer">
             <input type="checkbox" [checked]="showGhost()" (change)="showGhost.set(!showGhost())" />
             Ghost previous frame
           </label>
+          <input type="text"
+                 placeholder="Frame coaching note (e.g. Phase 1: High Press)..."
+                 class="bg-gray-900 text-white px-2.5 py-1 rounded border border-gray-700 w-64"
+                 [value]="store.note()"
+                 (input)="store.updateFrameNote($any($event.target).value)" />
         </div>
       </div>
     </div>
-  `
+  `,
 })
 export class PitchBoardComponent implements AfterViewInit, OnDestroy {
   @ViewChild('canvasContainer') canvasContainer!: ElementRef<HTMLDivElement>;
@@ -132,47 +525,235 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
   private ngZone = inject(NgZone);
   protected store = inject(BoardStore);
 
+  protected readonly formations = FORMATION_NAMES;
+  protected readonly drawingColors = DRAWING_COLORS;
+  protected readonly equipmentCatalog = EQUIPMENT_CATALOG;
+
+  // UI Signals
+  activeTool = signal<ActiveToolMode>('move');
+  isDrawingMode = computed(() => this.activeTool() !== 'move');
+  arrowStyle = signal<ArrowStyle>('pass');
+  shapeKind = signal<ShapeKind>('rect');
+  drawColor = signal('#f1c40f');
+  drawWidth = signal(4);
+  pendingText = signal('Press Trigger');
+  textSize = signal(18);
+
+  pitchView = signal<PitchViewMode>('full');
+  showStripes = signal(true);
+  showMarkings = signal(true);
+  showDivisions = signal(false);
+  showGhost = signal(true);
+  loopPlayback = signal(false);
+  showEquipmentTray = signal(false);
+  showCollections = signal(false);
+
+  selectedEntityId = signal<string | null>(null);
+  selectedEntity = computed(() => {
+    const id = this.selectedEntityId();
+    if (!id) return null;
+    return this.store.entities().find((e) => e.id === id) ?? null;
+  });
+
+  collections = signal<SavedCollectionItem[]>(loadCollections());
+  collectionTitle = signal('');
+  collectionCategory = signal<SavedCollectionItem['category']>('Match Tactic');
+
+  isPlaying = signal(false);
+  isExporting = signal(false);
+  exportKind = signal<'mp4' | 'gif'>('mp4');
+  exportProgress = signal(0);
+  private ffmpegCore?: any;
+  scrubPos = signal(0);
+  protected frameIndexes = computed(() => Array.from({ length: this.store.frameCount() }, (_, i) => i));
+  hasSavedBoard = signal(localStorage.getItem(STORAGE_KEY) !== null);
+  statusMessage = signal('');
+  private statusTimer?: ReturnType<typeof setTimeout>;
+
   constructor() {
-    // Keep Konva nodes in sync with the store (undo/redo, frame changes, load, reset).
-    // While the animation plays, Konva drives the nodes itself.
     effect(() => {
       this.showGhost();
+      this.store.homeColor();
+      this.store.awayColor();
       if (this.isPlaying() || this.isExporting()) return;
       this.syncFromStore();
     });
   }
 
-  /** Makes the canvas match the store: positions, arrows of the current frame and the ghost frame. */
   private syncFromStore() {
     const entities = this.store.entities();
     const arrows = this.store.arrows();
+    const shapes = this.store.shapes();
+    const texts = this.store.texts();
+    const note = this.store.note();
     const frames = this.store.frames();
     const current = this.store.currentFrame();
     const ghost = this.showGhost();
-    if (!this.entityLayer) return; // canvas not initialised yet
+    if (!this.entityLayer) return;
 
-    entities.forEach(e => {
-      const node = this.entityLayer.findOne('#' + e.id);
-      if (node && (node.x() !== e.x || node.y() !== e.y)) node.position({ x: e.x, y: e.y });
-    });
-
+    this.syncEntities(entities);
+    this.renderShapes(shapes);
     this.renderArrows(arrows, !this.isPlaying() && !this.isExporting());
+    this.renderTexts(texts, note);
     this.drawingLayer.opacity(1);
     this.renderGhost(ghost && current > 0 ? frames[current - 1].entities : null, entities);
     this.scrubPos.set(current);
 
+    this.shapesLayer.batchDraw();
     this.entityLayer.batchDraw();
     this.drawingLayer.batchDraw();
     this.ghostLayer.batchDraw();
   }
 
+  private renderShapes(shapes: TacticalShape[]) {
+    this.shapesLayer.destroyChildren();
+    shapes.forEach((s) => {
+      const node = this.createShapeNode(s);
+      node.on('click tap', (e) => {
+        if (this.activeTool() === 'eraser') {
+          e.cancelBubble = true;
+          this.ngZone.run(() => this.store.removeShape(s.id));
+        }
+      });
+      this.shapesLayer.add(node);
+    });
+  }
+
+  private createShapeNode(s: Pick<TacticalShape, 'kind' | 'x1' | 'y1' | 'x2' | 'y2' | 'color'>): Konva.Shape {
+    const x = Math.min(s.x1, s.x2);
+    const y = Math.min(s.y1, s.y2);
+    const w = Math.abs(s.x2 - s.x1);
+    const h = Math.abs(s.y2 - s.y1);
+    const fill = this.hexWithAlpha(s.color, 0.2);
+    const common = {
+      fill,
+      stroke: s.color,
+      strokeWidth: 2.5,
+      dash: [8, 5],
+      listening: this.activeTool() === 'eraser',
+    };
+
+    if (s.kind === 'ellipse') {
+      return new Konva.Ellipse({
+        x: x + w / 2,
+        y: y + h / 2,
+        radiusX: Math.max(4, w / 2),
+        radiusY: Math.max(4, h / 2),
+        ...common,
+      });
+    }
+    if (s.kind === 'triangle') {
+      return new Konva.Line({
+        points: [s.x1, s.y1, s.x2, s.y2, s.x1 * 2 - s.x2, s.y2],
+        closed: true,
+        ...common,
+      });
+    }
+    return new Konva.Rect({
+      x,
+      y,
+      width: w,
+      height: h,
+      cornerRadius: 4,
+      ...common,
+    });
+  }
+
+  private renderTexts(texts: TacticalText[], frameNote: string) {
+    // Frame coaching note banner at top center of pitch if non-empty
+    if (frameNote.trim()) {
+      const bannerWidth = Math.min(620, Math.max(220, frameNote.length * 9.5 + 36));
+      const bx = (this.BASE_WIDTH - bannerWidth) / 2;
+      const noteGroup = new Konva.Group({ x: bx, y: 12, listening: false });
+      noteGroup.add(
+        new Konva.Rect({
+          width: bannerWidth,
+          height: 28,
+          fill: 'rgba(17, 24, 39, 0.82)',
+          stroke: 'rgba(241, 196, 15, 0.65)',
+          strokeWidth: 1.5,
+          cornerRadius: 6,
+        }),
+        new Konva.Text({
+          width: bannerWidth,
+          height: 28,
+          text: frameNote,
+          fontSize: 14,
+          fontFamily: 'sans-serif',
+          fontStyle: 'bold',
+          fill: '#fef08a',
+          align: 'center',
+          verticalAlign: 'middle',
+        })
+      );
+      this.drawingLayer.add(noteGroup);
+    }
+
+    const canDrag = this.activeTool() === 'move' && !this.isPlaying() && !this.isExporting();
+    texts.forEach((t) => {
+      const textGroup = new Konva.Group({
+        x: t.x,
+        y: t.y,
+        draggable: canDrag,
+        listening: canDrag || this.activeTool() === 'eraser',
+      });
+      const padX = 8;
+      const padY = 4;
+      const txt = new Konva.Text({
+        text: t.text,
+        fontSize: t.fontSize,
+        fontFamily: 'sans-serif',
+        fontStyle: 'bold',
+        fill: t.color,
+        padding: padY,
+      });
+      const w = txt.width() + padX * 2;
+      const h = txt.height();
+      txt.offsetX(w / 2 - padX);
+      txt.offsetY(h / 2);
+
+      textGroup.add(
+        new Konva.Rect({
+          x: -w / 2,
+          y: -h / 2,
+          width: w,
+          height: h,
+          fill: 'rgba(17, 24, 39, 0.78)',
+          stroke: t.color,
+          strokeWidth: 1.2,
+          cornerRadius: 4,
+        }),
+        txt
+      );
+
+      textGroup.on('click tap', (e) => {
+        if (this.activeTool() === 'eraser') {
+          e.cancelBubble = true;
+          this.ngZone.run(() => this.store.removeText(t.id));
+        }
+      });
+      textGroup.on('dragend', () => {
+        const p = textGroup.position();
+        this.ngZone.run(() => this.store.updateTextPosition(t.id, Math.round(p.x), Math.round(p.y)));
+      });
+      this.drawingLayer.add(textGroup);
+    });
+  }
+
   private renderArrows(arrows: TacticalArrow[], showHandles = false) {
     this.drawingLayer.destroyChildren();
-    arrows.forEach(a => {
-      const arrowGroup = this.createArrow(a);
+    const isEraser = this.activeTool() === 'eraser';
+    arrows.forEach((a) => {
+      const arrowGroup = this.createArrow(a, isEraser);
+      if (isEraser) {
+        arrowGroup.on('click tap', (e) => {
+          e.cancelBubble = true;
+          this.ngZone.run(() => this.store.removeArrow(a.id));
+        });
+      }
       this.drawingLayer.add(arrowGroup);
 
-      if (showHandles) {
+      if (showHandles && !isEraser && a.style !== 'freehand') {
         const [x1, y1, x2, y2] = a.points;
         const [cx, cy] = a.controlPoint ?? [(x1 + x2) / 2, (y1 + y2) / 2];
         const handle = new Konva.Circle({
@@ -181,7 +762,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
           y: cy,
           radius: 6,
           fill: '#ffffff',
-          stroke: '#f1c40f',
+          stroke: a.color ?? '#f1c40f',
           strokeWidth: 2,
           opacity: 0.85,
           draggable: true,
@@ -193,7 +774,9 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
             };
           },
         });
-        handle.on('mouseenter', () => { this.stage.container().style.cursor = 'grab'; });
+        handle.on('mouseenter', () => {
+          this.stage.container().style.cursor = 'grab';
+        });
         handle.on('mouseleave', () => {
           this.stage.container().style.cursor = this.isDrawingMode() ? 'crosshair' : 'default';
         });
@@ -217,92 +800,170 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     this.ghostLayer.destroyChildren();
     if (!previous) return;
 
-    previous.forEach(p => {
-      const now = current.find(e => e.id === p.id);
+    previous.forEach((p) => {
+      const now = current.find((e) => e.id === p.id);
       if (!now || Math.hypot(now.x - p.x, now.y - p.y) < 4) return;
 
       const isBall = p.type === 'ball';
-      const color = p.type === 'home' ? '#e74c3c' : p.type === 'away' ? '#3498db' : '#ffffff';
-      this.ghostLayer.add(new Konva.Arrow({
-        points: [p.x, p.y, now.x, now.y],
-        stroke: 'rgba(255, 255, 255, 0.55)',
-        fill: 'rgba(255, 255, 255, 0.55)',
-        strokeWidth: 2,
-        dash: [8, 6],
-        pointerLength: 8,
-        pointerWidth: 8,
-        listening: false,
-      }));
-      this.ghostLayer.add(new Konva.Circle({
-        x: p.x, y: p.y,
-        radius: isBall ? 13 : 15,
-        fill: color,
-        opacity: 0.3,
-        stroke: '#ffffff',
-        strokeWidth: 1,
-        dash: [4, 3],
-        listening: false,
-      }));
+      const color =
+        p.color ??
+        (p.type === 'home'
+          ? this.store.homeColor()
+          : p.type === 'away'
+            ? this.store.awayColor()
+            : '#ffffff');
+      this.ghostLayer.add(
+        new Konva.Arrow({
+          points: [p.x, p.y, now.x, now.y],
+          stroke: 'rgba(255, 255, 255, 0.55)',
+          fill: 'rgba(255, 255, 255, 0.55)',
+          strokeWidth: 2,
+          dash: [8, 6],
+          pointerLength: 8,
+          pointerWidth: 8,
+          listening: false,
+        })
+      );
+      this.ghostLayer.add(
+        new Konva.Circle({
+          x: p.x,
+          y: p.y,
+          radius: isBall ? 13 : 15,
+          fill: color,
+          opacity: 0.3,
+          stroke: '#ffffff',
+          strokeWidth: 1,
+          dash: [4, 3],
+          listening: false,
+        })
+      );
     });
   }
 
   private readonly ZONE_RADIUS = 28;
 
-  private createArrow(arrow: Pick<TacticalArrow, 'points' | 'style' | 'controlPoint'>): Konva.Group {
+  private createArrow(
+    arrow: Pick<TacticalArrow, 'points' | 'style' | 'controlPoint' | 'color' | 'strokeWidth' | 'pathPoints'>,
+    interactive = false
+  ): Konva.Group {
     const style = arrow.style ?? 'pass';
-    const group = new Konva.Group({ listening: false });
+    const color = arrow.color ?? '#f1c40f';
+    const strokeWidth = arrow.strokeWidth ?? 4;
+    const group = new Konva.Group({ listening: interactive });
 
     if (style === 'zone') {
       const [, , x2, y2] = arrow.points;
-      group.add(new Konva.Circle({
-        name: 'zone-outer',
-        x: x2,
-        y: y2,
-        radius: this.ZONE_RADIUS,
-        fill: 'rgba(241, 196, 15, 0.20)',
-        stroke: '#f1c40f',
-        strokeWidth: 2.5,
-        dash: [8, 5],
-        listening: false,
-      }));
-      group.add(new Konva.Circle({
-        name: 'zone-inner',
-        x: x2,
-        y: y2,
-        radius: 5,
-        fill: 'rgba(241, 196, 15, 0.55)',
-        listening: false,
-      }));
+      group.add(
+        new Konva.Circle({
+          name: 'zone-outer',
+          x: x2,
+          y: y2,
+          radius: this.ZONE_RADIUS,
+          fill: this.hexWithAlpha(color, 0.2),
+          stroke: color,
+          strokeWidth: 2.5,
+          dash: [8, 5],
+          listening: interactive,
+        })
+      );
+      group.add(
+        new Konva.Circle({
+          name: 'zone-inner',
+          x: x2,
+          y: y2,
+          radius: 5,
+          fill: this.hexWithAlpha(color, 0.55),
+          listening: false,
+        })
+      );
     }
 
-    const pathPoints = this.computeArrowPath(arrow.points, style, arrow.controlPoint);
-    group.add(new Konva.Arrow({
-      name: 'arrow-line',
-      points: pathPoints,
-      pointerLength: 15,
-      pointerWidth: 15,
-      fill: '#f1c40f',
-      stroke: '#f1c40f',
-      strokeWidth: 4,
-      dash: style === 'run' || style === 'zone' ? [12, 8] : undefined,
-      tension: style === 'dribble' ? 0.35 : 0,
-      lineCap: 'round',
-      lineJoin: 'round',
-      listening: false,
-    }));
+    const pathPoints =
+      style === 'freehand' && arrow.pathPoints && arrow.pathPoints.length >= 4
+        ? arrow.pathPoints
+        : this.computeArrowPath(arrow.points, style, arrow.controlPoint);
+
+    if (style === 'block') {
+      group.add(
+        new Konva.Line({
+          name: 'arrow-line',
+          points: pathPoints,
+          stroke: color,
+          strokeWidth,
+          hitStrokeWidth: 18,
+          lineCap: 'round',
+          lineJoin: 'round',
+          listening: interactive,
+        })
+      );
+      const tbarPts = this.computeTBarPoints(pathPoints);
+      group.add(
+        new Konva.Line({
+          name: 'block-tbar',
+          points: tbarPts,
+          stroke: color,
+          strokeWidth: strokeWidth + 1,
+          lineCap: 'round',
+          listening: interactive,
+        })
+      );
+      return group;
+    }
+
+    group.add(
+      new Konva.Arrow({
+        name: 'arrow-line',
+        points: pathPoints,
+        pointerLength: 15,
+        pointerWidth: 15,
+        fill: color,
+        stroke: color,
+        strokeWidth,
+        hitStrokeWidth: 18,
+        dash: style === 'run' || style === 'zone' ? [12, 8] : undefined,
+        tension: style === 'dribble' || style === 'freehand' ? 0.35 : 0,
+        lineCap: 'round',
+        lineJoin: 'round',
+        listening: interactive,
+      })
+    );
 
     return group;
+  }
+
+  private computeTBarPoints(pathPoints: number[]): [number, number, number, number] {
+    const n = pathPoints.length;
+    const x2 = pathPoints[n - 2] ?? 0;
+    const y2 = pathPoints[n - 1] ?? 0;
+    const x1 = pathPoints[Math.max(0, n - 4)] ?? x2 - 1;
+    const y1 = pathPoints[Math.max(1, n - 3)] ?? y2;
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const len = Math.hypot(dx, dy) || 1;
+    const nx = -dy / len;
+    const ny = dx / len;
+    const half = 14;
+    return [x2 - nx * half, y2 - ny * half, x2 + nx * half, y2 + ny * half];
   }
 
   private updateArrowGroup(
     group: Konva.Group,
     points: [number, number, number, number],
     style: ArrowStyle,
-    controlPoint?: [number, number]
+    controlPoint?: [number, number],
+    freehandPts?: number[]
   ) {
-    const line = group.findOne<Konva.Arrow>('.arrow-line');
+    const pathPts =
+      style === 'freehand' && freehandPts && freehandPts.length >= 4
+        ? freehandPts
+        : this.computeArrowPath(points, style, controlPoint);
+    const line = group.findOne<Konva.Line>('.arrow-line');
     if (line) {
-      line.points(this.computeArrowPath(points, style, controlPoint));
+      line.points(pathPts);
+    }
+    if (style === 'block') {
+      const tbar = group.findOne<Konva.Line>('.block-tbar');
+      if (tbar) tbar.points(this.computeTBarPoints(pathPts));
     }
     if (style === 'zone') {
       const [, , x2, y2] = points;
@@ -326,14 +987,13 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     const [cx, cy] = controlPoint ?? [mx, my];
     const isCurved = Math.hypot(cx - mx, cy - my) > 1.5;
 
-    // Quadratic Bezier control point so the curve passes directly through the handle (cx, cy) at t = 0.5
     const qx = 2 * cx - 0.5 * (x1 + rawX2);
     const qy = 2 * cy - 0.5 * (y1 + rawY2);
 
-    // For 'zone', stop the arrow tip right at the rim of the target zone circle so it points cleanly into the space
-    const endT = style === 'zone' && rawDist > this.ZONE_RADIUS + 12
-      ? Math.max(0.25, 1 - (this.ZONE_RADIUS - 2) / rawDist)
-      : 1;
+    const endT =
+      style === 'zone' && rawDist > this.ZONE_RADIUS + 12
+        ? Math.max(0.25, 1 - (this.ZONE_RADIUS - 2) / rawDist)
+        : 1;
 
     const pointAt = (t: number): [number, number] => {
       const s = t * endT;
@@ -362,7 +1022,6 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
       for (let i = 0; i <= steps; i++) {
         const t = i / steps;
         const [bx, by] = pointAt(t);
-        // Keep the last 18px straight so the arrowhead points cleanly in the travel direction
         const fade = t > 0.85 ? Math.max(0, (1 - t) / 0.15) : Math.min(1, t / 0.08);
         const offset = Math.sin(t * cycles * Math.PI * 2) * amp * fade;
         const [tx, ty] = tangentAt(t);
@@ -385,29 +1044,37 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     return out;
   }
 
-  // UI State
-  isDrawingMode = signal(false);
-  arrowStyle = signal<ArrowStyle>('pass');
-  showDivisions = signal(false);
-  showGhost = signal(true);
-  isPlaying = signal(false);
-  isExporting = signal(false);
-  exportProgress = signal(0);
-  private ffmpegCore?: any;
-  scrubPos = signal(0);
-  protected frameIndexes = computed(() => Array.from({ length: this.store.frameCount() }, (_, i) => i));
-  hasSavedBoard = signal(localStorage.getItem(STORAGE_KEY) !== null);
-  statusMessage = signal('');
-  private statusTimer?: ReturnType<typeof setTimeout>;
+  private hexWithAlpha(hex: string, alpha: number): string {
+    const clean = hex.replace('#', '');
+    if (clean.length === 6) {
+      const r = parseInt(clean.slice(0, 2), 16);
+      const g = parseInt(clean.slice(2, 4), 16);
+      const b = parseInt(clean.slice(4, 6), 16);
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+    return `rgba(241, 196, 15, ${alpha})`;
+  }
 
   @HostListener('window:keydown', ['$event'])
   onKeydown(event: KeyboardEvent) {
     if (this.isPlaying() || this.isExporting()) return;
 
-    // Frame navigation (ignored while a slider/input has focus so it keeps its own arrow-key behaviour)
-    if (!(event.target instanceof HTMLInputElement)) {
-      if (event.key === 'ArrowLeft') { this.store.goToFrame(this.store.currentFrame() - 1); return; }
-      if (event.key === 'ArrowRight') { this.store.goToFrame(this.store.currentFrame() + 1); return; }
+    if (!(event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement)) {
+      if (event.key === 'ArrowLeft') {
+        this.store.goToFrame(this.store.currentFrame() - 1);
+        return;
+      }
+      if (event.key === 'ArrowRight') {
+        this.store.goToFrame(this.store.currentFrame() + 1);
+        return;
+      }
+      if (event.key === 'Escape') {
+        this.activeTool.set('move');
+        this.selectedEntityId.set(null);
+        this.updateDraggable();
+        this.syncFromStore();
+        return;
+      }
     }
 
     if (!(event.ctrlKey || event.metaKey)) return;
@@ -421,8 +1088,146 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     }
   }
 
+  onFormationChange(team: 'home' | 'away', formation: FormationName) {
+    this.store.applyFormation(team, formation);
+    this.showStatus(`${team === 'home' ? 'Home' : 'Away'} formation set to ${formation}`);
+  }
+
+  onTeamColorChange(team: 'home' | 'away', color: string) {
+    this.store.setTeamColor(team, color);
+    this.syncFromStore();
+  }
+
+  setPitchView(view: PitchViewMode) {
+    this.pitchView.set(view);
+    setTimeout(() => this.applyStageViewport(), 0);
+  }
+
+  toggleStripes() {
+    this.showStripes.set(!this.showStripes());
+    this.drawPitch();
+    this.pitchLayer.batchDraw();
+  }
+
+  toggleMarkings() {
+    this.showMarkings.set(!this.showMarkings());
+    this.drawPitch();
+    this.pitchLayer.batchDraw();
+  }
+
+  spawnSquadToken(type: 'home' | 'away' | 'referee' | 'ball') {
+    const existing = this.store.entities().filter((e) => e.type === type);
+    const nextNum = type === 'home' || type === 'away' ? String(existing.length + 1) : type === 'referee' ? 'R' : undefined;
+    const id = this.store.addEntity({
+      type,
+      x: 525 + (Math.random() * 60 - 30),
+      y: 340 + (Math.random() * 60 - 30),
+      ...(nextNum ? { label: nextNum } : {}),
+    });
+    this.activeTool.set('move');
+    this.selectedEntityId.set(id);
+    this.updateDraggable();
+    this.showStatus(`Added ${type} token`);
+  }
+
+  spawnEquipment(kind: EquipmentKind, defaultColor: string) {
+    const id = this.store.addEntity({
+      type: 'equipment',
+      equipmentKind: kind,
+      color: defaultColor,
+      rotation: 0,
+      x: 525 + Math.round(Math.random() * 80 - 40),
+      y: 340 + Math.round(Math.random() * 80 - 40),
+    });
+    this.activeTool.set('move');
+    this.selectedEntityId.set(id);
+    this.updateDraggable();
+    this.showStatus(`Added ${kind}`);
+  }
+
+  updateSelectedMeta(patch: Partial<TacticalEntity>) {
+    const id = this.selectedEntityId();
+    if (!id) return;
+    this.store.updateEntityMeta(id, patch);
+  }
+
+  deleteSelectedEntity() {
+    const id = this.selectedEntityId();
+    if (!id || id === 'ball') return;
+    this.store.removeEntity(id);
+    this.selectedEntityId.set(null);
+    this.showStatus('Removed from pitch');
+  }
+
+  // ---- Collections & Share Link ----
+  addCurrentToCollections() {
+    const updated = saveToCollections(
+      this.collectionTitle(),
+      this.collectionCategory(),
+      this.store.exportBoard()
+    );
+    this.collections.set(updated);
+    this.collectionTitle.set('');
+    this.showStatus('Saved scheme to Collections');
+  }
+
+  loadFromCollection(item: SavedCollectionItem) {
+    if (this.store.importBoard(item.data)) {
+      this.syncFromStore();
+      this.showStatus(`Loaded "${item.title}"`);
+    }
+  }
+
+  removeFromCollection(id: string) {
+    this.collections.set(deleteFromCollections(id));
+  }
+
+  exportJsonFile() {
+    const data = JSON.stringify(this.store.exportBoard(), null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
+    this.triggerDownload(blob, 'tactical-board-scheme.json');
+    this.showStatus('Exported tactical-board-scheme.json');
+  }
+
+  importJsonFile(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(String(reader.result));
+        if (this.store.importBoard(parsed)) {
+          this.syncFromStore();
+          this.showStatus(`Imported ${file.name}`);
+        } else {
+          this.showStatus('Invalid scheme file');
+        }
+      } catch {
+        this.showStatus('Failed to parse JSON file');
+      }
+      input.value = '';
+    };
+    reader.readAsText(file);
+  }
+
+  shareSchemeLink() {
+    try {
+      const hash = encodeSchemeHash(this.store.exportBoard());
+      const url = `${window.location.origin}${window.location.pathname}${hash}`;
+      window.history.replaceState(null, '', hash);
+      if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(url).catch(() => {});
+      }
+      this.showStatus('Shareable link copied & updated in URL');
+    } catch {
+      this.showStatus('Could not generate share link');
+    }
+  }
+
   resetBoard() {
     this.store.reset();
+    this.selectedEntityId.set(null);
     this.showStatus('Board reset (Ctrl+Z to undo)');
   }
 
@@ -461,13 +1266,14 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
   // ---- Timeline playback ----
   private activeTweens: Konva.Tween[] = [];
   private playbackTarget = 0;
+  private singleStepOnly = false;
 
   play() {
     if (this.isPlaying()) return;
     const last = this.store.frameCount() - 1;
     if (last < 1) return;
 
-    // Start from the current frame, or from the beginning if we're already at the end
+    this.singleStepOnly = false;
     if (this.store.currentFrame() >= last) this.store.goToFrame(0);
     this.syncFromStore();
     this.playbackTarget = this.store.currentFrame();
@@ -477,12 +1283,30 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     this.ngZone.runOutsideAngular(() => this.playStep(this.playbackTarget));
   }
 
+  playSingleStep() {
+    if (this.isPlaying()) return;
+    const last = this.store.frameCount() - 1;
+    if (last < 1) return;
+
+    this.singleStepOnly = true;
+    const start = this.store.currentFrame() >= last ? 0 : this.store.currentFrame();
+    if (start !== this.store.currentFrame()) this.store.goToFrame(start);
+    this.syncFromStore();
+    this.playbackTarget = start;
+
+    this.isPlaying.set(true);
+    this.updateDraggable();
+    this.ngZone.runOutsideAngular(() => this.playStep(start));
+  }
+
   stopPlayback() {
-    this.activeTweens.forEach(t => { t.pause(); t.destroy(); });
+    this.activeTweens.forEach((t) => {
+      t.pause();
+      t.destroy();
+    });
     this.activeTweens = [];
     this.drawingLayer.opacity(1);
 
-    // Stay on the frame we were heading to; the sync effect then snaps everything to it
     this.ngZone.run(() => {
       this.store.goToFrame(this.playbackTarget);
       this.isPlaying.set(false);
@@ -496,6 +1320,13 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     const frames = this.store.frames();
     const to = from + 1;
     if (to >= frames.length) {
+      if (this.loopPlayback() && !this.singleStepOnly && frames.length >= 2) {
+        this.ngZone.run(() => this.store.goToFrame(0));
+        this.syncFromStore();
+        this.playbackTarget = 0;
+        this.playStep(0);
+        return;
+      }
       this.stopPlayback();
       return;
     }
@@ -505,55 +1336,145 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     const seconds = this.store.stepDurationMs() / 1000;
     this.ghostLayer.destroyChildren();
     this.ghostLayer.batchDraw();
+    this.renderShapes(frames[to].shapes ?? []);
+    this.shapesLayer.batchDraw();
     const stepArrows = frames[to].arrows.length > 0 ? frames[to].arrows : frames[from].arrows;
     this.renderArrows(stepArrows);
+    this.renderTexts(frames[to].texts ?? [], frames[to].note ?? '');
     this.drawingLayer.opacity(frames[to].arrows.length > 0 ? 0 : 1);
 
     const tweens: Konva.Tween[] = [];
-    frames[to].entities.forEach(e => {
+    frames[to].entities.forEach((e) => {
       const node = this.entityLayer.findOne('#' + e.id);
       if (!node || (node.x() === e.x && node.y() === e.y)) return;
-      tweens.push(new Konva.Tween({ node, duration: seconds, x: e.x, y: e.y, easing: Konva.Easings.EaseInOut }));
+      tweens.push(
+        new Konva.Tween({ node, duration: seconds, x: e.x, y: e.y, easing: Konva.Easings.EaseInOut })
+      );
     });
-    // The arrow layer's fade also acts as the step clock
-    tweens.push(new Konva.Tween({
-      node: this.drawingLayer,
-      duration: seconds,
-      opacity: 1,
-      easing: Konva.Easings.EaseInOut,
-      onFinish: () => this.playStep(to),
-    }));
+    tweens.push(
+      new Konva.Tween({
+        node: this.drawingLayer,
+        duration: seconds,
+        opacity: 1,
+        easing: Konva.Easings.EaseInOut,
+        onFinish: () => {
+          if (this.singleStepOnly) {
+            this.stopPlayback();
+          } else {
+            this.playStep(to);
+          }
+        },
+      })
+    );
 
     this.activeTweens = tweens;
-    tweens.forEach(t => t.play());
+    tweens.forEach((t) => t.play());
   }
 
   private updateDraggable() {
-    const draggable = !this.isDrawingMode() && !this.isPlaying() && !this.isExporting();
+    const isMove = this.activeTool() === 'move' && !this.isPlaying() && !this.isExporting();
+    const isEraser = this.activeTool() === 'eraser' && !this.isPlaying() && !this.isExporting();
     if (this.entityLayer) {
-      this.entityLayer.listening(draggable);
-      this.entityLayer.getChildren().forEach(group => group.draggable(draggable));
+      this.entityLayer.listening(isMove || isEraser);
+      this.entityLayer.getChildren().forEach((group) => group.draggable(isMove));
     }
     if (this.stage) {
-      this.stage.container().style.cursor = this.isDrawingMode() ? 'crosshair' : 'default';
+      this.stage.container().style.cursor =
+        this.activeTool() === 'eraser'
+          ? 'pointer'
+          : this.isDrawingMode()
+            ? 'crosshair'
+            : 'default';
     }
+  }
+
+  toggleDrawingMode() {
+    if (this.isDrawingMode()) {
+      this.activeTool.set('move');
+    } else {
+      this.activeTool.set('arrow');
+    }
+    this.selectedEntityId.set(null);
+    this.updateDraggable();
+    this.syncFromStore();
   }
 
   selectArrowStyle(style: ArrowStyle) {
     this.arrowStyle.set(style);
-    if (!this.isDrawingMode()) {
-      this.isDrawingMode.set(true);
-      this.updateDraggable();
+    this.activeTool.set('arrow');
+    this.selectedEntityId.set(null);
+    this.updateDraggable();
+    this.syncFromStore();
+  }
+
+  selectShapeTool(kind: ShapeKind) {
+    this.shapeKind.set(kind);
+    this.activeTool.set('shape');
+    this.selectedEntityId.set(null);
+    this.updateDraggable();
+    this.syncFromStore();
+  }
+
+  selectTextTool() {
+    this.activeTool.set('text');
+    this.selectedEntityId.set(null);
+    this.updateDraggable();
+    this.syncFromStore();
+    this.showStatus('Click anywhere on the pitch to place text');
+  }
+
+  selectEraserTool() {
+    this.activeTool.set(this.activeTool() === 'eraser' ? 'move' : 'eraser');
+    this.selectedEntityId.set(null);
+    this.updateDraggable();
+    this.syncFromStore();
+    if (this.activeTool() === 'eraser') {
+      this.showStatus('Eraser active: click any arrow, zone, text, or equipment to delete it');
     }
   }
 
-  // ---- Client-side MP4 video export via FFmpeg.wasm ----
+  // ---- Export PNG, GIF & MP4 ----
+  exportPng() {
+    if (!this.stage) return;
+    this.renderArrows(this.store.arrows(), false);
+    this.renderTexts(this.store.texts(), this.store.note());
+    this.stage.draw();
+    const scale = this.stage.scaleX() || 1;
+    const dataUrl = this.stage.toDataURL({
+      pixelRatio: 2 / scale,
+      mimeType: 'image/png',
+    });
+    this.syncFromStore();
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = 'tactical-board.png';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    this.showStatus('PNG exported (tactical-board.png)');
+  }
+
+  async exportGif() {
+    await this.runVideoExport('gif');
+  }
+
   async exportMp4() {
+    await this.runVideoExport('mp4');
+  }
+
+  private async runVideoExport(kind: 'mp4' | 'gif') {
     if (this.isExporting() || this.isPlaying() || this.store.frameCount() < 2) return;
     this.isExporting.set(true);
+    this.exportKind.set(kind);
     this.exportProgress.set(0);
     this.updateDraggable();
     this.showStatus('Loading FFmpeg.wasm...');
+
+    const savedView = this.pitchView();
+    if (savedView !== 'full') {
+      this.pitchView.set('full');
+      this.applyStageViewport();
+    }
 
     const writtenFiles: string[] = [];
     try {
@@ -568,7 +1489,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
       const core = this.ffmpegCore;
 
       const frames = this.store.frames();
-      const fps = 30;
+      const fps = kind === 'gif' ? 15 : 30;
       const framesPerStep = Math.max(6, Math.round((this.store.stepDurationMs() / 1000) * fps));
       const holdStart = Math.round(fps * 0.4);
       const holdEnd = Math.round(fps * 0.6);
@@ -597,34 +1518,32 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
       let frameIdx = 0;
 
       // 1. Render initial keyframe hold
-      frames[0].entities.forEach(e => {
-        const node = this.entityLayer.findOne('#' + e.id);
-        if (node) node.position({ x: e.x, y: e.y });
-      });
-      this.renderArrows(frames[0].arrows);
+      this.syncEntities(frames[0].entities);
+      this.renderShapes(frames[0].shapes ?? []);
+      this.renderArrows(frames[0].arrows, false);
+      this.renderTexts(frames[0].texts ?? [], frames[0].note ?? '');
       this.drawingLayer.opacity(1);
-      this.entityLayer.batchDraw();
-      this.drawingLayer.batchDraw();
 
       for (let h = 0; h < holdStart; h++) {
         capturePng(frameIdx++);
       }
       this.exportProgress.set(Math.round((frameIdx / totalVideoFrames) * 60));
       this.showStatus('Rendering tactical animation frames...');
-      await new Promise(r => setTimeout(r, 0));
+      await new Promise((r) => setTimeout(r, 0));
 
       // 2. Render interpolated transition steps
       for (let step = 0; step < totalTransitions; step++) {
         const fromFrame = frames[step];
         const toFrame = frames[step + 1];
-        const nextMap = new Map(toFrame.entities.map(e => [e.id, e]));
+        const nextMap = new Map(toFrame.entities.map((e) => [e.id, e]));
         const hasFromArrows = fromFrame.arrows.length > 0;
         const hasToArrows = toFrame.arrows.length > 0;
+        this.renderShapes(toFrame.shapes ?? fromFrame.shapes ?? []);
 
         for (let f = 1; f <= framesPerStep; f++) {
           const linear = f / framesPerStep;
           const progress = Konva.Easings.EaseInOut(linear, 0, 1, 1);
-          fromFrame.entities.forEach(a => {
+          fromFrame.entities.forEach((a) => {
             const b = nextMap.get(a.id);
             const node = this.entityLayer.findOne('#' + a.id);
             if (b && node) {
@@ -633,41 +1552,42 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
           });
           if (hasFromArrows && hasToArrows) {
             if (linear < 0.5) {
-              this.renderArrows(fromFrame.arrows);
+              this.renderArrows(fromFrame.arrows, false);
+              this.renderTexts(fromFrame.texts ?? [], fromFrame.note ?? '');
               this.drawingLayer.opacity(1 - linear * 0.6);
             } else {
-              this.renderArrows(toFrame.arrows);
+              this.renderArrows(toFrame.arrows, false);
+              this.renderTexts(toFrame.texts ?? [], toFrame.note ?? '');
               this.drawingLayer.opacity(0.4 + (linear - 0.5) * 1.2);
             }
           } else if (hasToArrows) {
-            this.renderArrows(toFrame.arrows);
+            this.renderArrows(toFrame.arrows, false);
+            this.renderTexts(toFrame.texts ?? [], toFrame.note ?? '');
             this.drawingLayer.opacity(progress);
           } else {
-            this.renderArrows(fromFrame.arrows);
+            this.renderArrows(fromFrame.arrows, false);
+            this.renderTexts(fromFrame.texts ?? [], fromFrame.note ?? '');
             this.drawingLayer.opacity(1);
           }
-          this.entityLayer.batchDraw();
-          this.drawingLayer.batchDraw();
 
           capturePng(frameIdx++);
           if (f % 5 === 0) {
             this.exportProgress.set(Math.round((frameIdx / totalVideoFrames) * 60));
-            await new Promise(r => setTimeout(r, 0));
+            await new Promise((r) => setTimeout(r, 0));
           }
         }
       }
 
       // 3. Hold final frame
       this.drawingLayer.opacity(1);
-      this.drawingLayer.batchDraw();
       for (let h = 0; h < holdEnd; h++) {
         capturePng(frameIdx++);
       }
 
-      // 4. Encode MP4 in FFmpeg.wasm
-      this.showStatus('Encoding MP4 video...');
+      // 4. Encode MP4 or GIF in FFmpeg.wasm
+      this.showStatus(kind === 'gif' ? 'Encoding animated GIF...' : 'Encoding MP4 video...');
       this.exportProgress.set(65);
-      await new Promise(r => setTimeout(r, 20));
+      await new Promise((r) => setTimeout(r, 20));
 
       core.setProgress(({ progress }: { progress: number }) => {
         if (Number.isFinite(progress)) {
@@ -685,88 +1605,148 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
         return ret;
       };
 
-      try { core.FS.unlink('tactical-board.mp4'); } catch {}
+      const outName = kind === 'gif' ? 'tactical-board.gif' : 'tactical-board.mp4';
+      try {
+        core.FS.unlink(outName);
+      } catch {}
 
-      const durationSec = (frameIdx / fps).toFixed(3);
-      const vf =
-        'scale=1280:720:force_original_aspect_ratio=decrease:flags=lanczos,' +
-        'pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=#111827,' +
-        'setsar=1,format=yuv420p';
-
-      const ret = runExec([
-        '-framerate', String(fps),
-        '-i', 'f_%04d.png',
-        '-f', 'lavfi',
-        '-t', durationSec,
-        '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100',
-        '-vf', vf,
-        '-c:v', 'libx264',
-        '-preset', 'veryfast',
-        '-profile:v', 'main',
-        '-level', '3.1',
-        '-bf', '0',
-        '-crf', '20',
-        '-pix_fmt', 'yuv420p',
-        '-colorspace', 'bt709',
-        '-color_primaries', 'bt709',
-        '-color_trc', 'bt709',
-        '-color_range', 'tv',
-        '-c:a', 'aac',
-        '-b:a', '96k',
-        '-shortest',
-        '-brand', 'mp42',
-        '-movflags', '+faststart',
-        'tactical-board.mp4',
-      ]);
-      if (ret !== 0) {
-        try { core.FS.unlink('tactical-board.mp4'); } catch {}
+      if (kind === 'gif') {
         runExec([
-          '-framerate', String(fps),
-          '-i', 'f_%04d.png',
-          '-vf', vf,
-          '-c:v', 'libx264',
-          '-preset', 'ultrafast',
-          '-profile:v', 'baseline',
-          '-level', '3.0',
-          '-pix_fmt', 'yuv420p',
-          '-brand', 'mp42',
-          '-movflags', '+faststart',
-          'tactical-board.mp4',
+          '-framerate',
+          String(fps),
+          '-i',
+          'f_%04d.png',
+          '-vf',
+          `fps=${fps},scale=840:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=256:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5`,
+          '-loop',
+          '0',
+          outName,
         ]);
+      } else {
+        const durationSec = (frameIdx / fps).toFixed(3);
+        const vf =
+          'scale=1280:720:force_original_aspect_ratio=decrease:flags=lanczos,' +
+          'pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=#111827,' +
+          'setsar=1,format=yuv420p';
+
+        const ret = runExec([
+          '-framerate',
+          String(fps),
+          '-i',
+          'f_%04d.png',
+          '-f',
+          'lavfi',
+          '-t',
+          durationSec,
+          '-i',
+          'anullsrc=channel_layout=stereo:sample_rate=44100',
+          '-vf',
+          vf,
+          '-c:v',
+          'libx264',
+          '-preset',
+          'veryfast',
+          '-profile:v',
+          'main',
+          '-level',
+          '3.1',
+          '-bf',
+          '0',
+          '-crf',
+          '20',
+          '-pix_fmt',
+          'yuv420p',
+          '-colorspace',
+          'bt709',
+          '-color_primaries',
+          'bt709',
+          '-color_trc',
+          'bt709',
+          '-color_range',
+          'tv',
+          '-c:a',
+          'aac',
+          '-b:a',
+          '96k',
+          '-shortest',
+          '-brand',
+          'mp42',
+          '-movflags',
+          '+faststart',
+          outName,
+        ]);
+        if (ret !== 0) {
+          try {
+            core.FS.unlink(outName);
+          } catch {}
+          runExec([
+            '-framerate',
+            String(fps),
+            '-i',
+            'f_%04d.png',
+            '-vf',
+            vf,
+            '-c:v',
+            'libx264',
+            '-preset',
+            'ultrafast',
+            '-profile:v',
+            'baseline',
+            '-level',
+            '3.0',
+            '-pix_fmt',
+            'yuv420p',
+            '-brand',
+            'mp42',
+            '-movflags',
+            '+faststart',
+            outName,
+          ]);
+        }
       }
 
-      const data: Uint8Array = core.FS.readFile('tactical-board.mp4', { encoding: 'binary' });
-      writtenFiles.push('tactical-board.mp4');
+      const data: Uint8Array = core.FS.readFile(outName, { encoding: 'binary' });
+      writtenFiles.push(outName);
       if (!data || data.byteLength < 256) {
-        throw new Error(`Encoded MP4 is empty (${data?.byteLength ?? 0} bytes)`);
+        throw new Error(`Encoded ${kind.toUpperCase()} is empty (${data?.byteLength ?? 0} bytes)`);
       }
       const copy = new Uint8Array(data.byteLength);
       copy.set(data);
-      const blob = new Blob([copy.buffer], { type: 'video/mp4' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'tactical-board.mp4';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      const blob = new Blob([copy.buffer], { type: kind === 'gif' ? 'image/gif' : 'video/mp4' });
+      this.triggerDownload(blob, outName);
 
       this.exportProgress.set(100);
-      this.showStatus('MP4 exported (tactical-board.mp4)');
+      this.showStatus(`${kind.toUpperCase()} exported (${outName})`);
     } catch (err) {
-      console.error('MP4 export failed:', err);
-      this.showStatus('MP4 export failed');
+      console.error(`${kind.toUpperCase()} export failed:`, err);
+      this.showStatus(`${kind.toUpperCase()} export failed`);
     } finally {
       if (this.ffmpegCore) {
         for (const f of writtenFiles) {
-          try { this.ffmpegCore.FS.unlink(f); } catch {}
+          try {
+            this.ffmpegCore.FS.unlink(f);
+          } catch {}
         }
+      }
+      if (savedView !== 'full') {
+        this.pitchView.set(savedView);
+        this.applyStageViewport();
       }
       this.isExporting.set(false);
       this.updateDraggable();
       this.syncFromStore();
     }
+  }
+
+  private triggerDownload(blob: Blob, filename: string) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
   }
 
   // ---- Scrubber: preview positions between two frames without changing the store ----
@@ -778,7 +1758,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
 
   onScrubEnd() {
     this.store.goToFrame(Math.round(this.scrubPos()));
-    this.syncFromStore(); // also snaps the pieces back when the frame didn't change
+    this.syncFromStore();
   }
 
   private previewAt(t: number) {
@@ -787,19 +1767,23 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
 
     const i = Math.min(Math.floor(t), frames.length - 2);
     const progress = Konva.Easings.EaseInOut(t - i, 0, 1, 1);
-    const next = new Map(frames[i + 1].entities.map(e => [e.id, e]));
+    const next = new Map(frames[i + 1].entities.map((e) => [e.id, e]));
 
-    frames[i].entities.forEach(a => {
+    frames[i].entities.forEach((a) => {
       const b = next.get(a.id);
       const node = this.entityLayer.findOne('#' + a.id);
       if (!b || !node) return;
       node.position({ x: a.x + (b.x - a.x) * progress, y: a.y + (b.y - a.y) * progress });
     });
 
-    const primaryArrows = frames[t - i < 0.5 ? i : i + 1].arrows;
+    const activeIdx = t - i < 0.5 ? i : i + 1;
+    const primaryArrows = frames[activeIdx].arrows;
     const fallbackArrows = frames[t - i < 0.5 ? i + 1 : i].arrows;
+    this.renderShapes(frames[activeIdx].shapes ?? []);
     this.renderArrows(primaryArrows.length > 0 ? primaryArrows : fallbackArrows);
+    this.renderTexts(frames[activeIdx].texts ?? [], frames[activeIdx].note ?? '');
     this.ghostLayer.destroyChildren();
+    this.shapesLayer.batchDraw();
     this.ghostLayer.batchDraw();
     this.entityLayer.batchDraw();
     this.drawingLayer.batchDraw();
@@ -808,32 +1792,53 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
   private showStatus(message: string) {
     this.statusMessage.set(message);
     clearTimeout(this.statusTimer);
-    this.statusTimer = setTimeout(() => this.statusMessage.set(''), 2500);
+    this.statusTimer = setTimeout(() => this.statusMessage.set(''), 2800);
   }
 
   // Konva Core
   private stage!: Konva.Stage;
   private pitchLayer!: Konva.Layer;
-  private drawingLayer!: Konva.Layer;
-  private ghostLayer!: Konva.Layer;
   private divisionsLayer!: Konva.Layer;
+  private shapesLayer!: Konva.Layer;
+  private ghostLayer!: Konva.Layer;
+  private drawingLayer!: Konva.Layer;
   private entityLayer!: Konva.Layer;
   private resizeObserver!: ResizeObserver;
 
   // Drawing State
   private currentArrow: Konva.Group | null = null;
+  private currentShape: Konva.Shape | null = null;
   private currentArrowStart: [number, number] = [0, 0];
   private currentArrowEnd: [number, number] = [0, 0];
+  private freehandPoints: number[] = [];
 
   private readonly BASE_WIDTH = 1050;
   private readonly BASE_HEIGHT = 680;
 
   ngAfterViewInit() {
+    // Load shared scheme from URL hash if present
+    const fromUrl = decodeSchemeHash(window.location.hash);
+    if (fromUrl) {
+      this.store.importBoard(fromUrl);
+      this.showStatus('Loaded tactical scheme from shared link');
+    }
+
+    const testCanvas = document.createElement('canvas');
+    let has2dContext = false;
+    try {
+      has2dContext = !!testCanvas.getContext('2d');
+    } catch {
+      has2dContext = false;
+    }
+    if (!has2dContext) {
+      return;
+    }
+
     this.ngZone.runOutsideAngular(() => {
       this.initCanvas();
       this.drawPitch();
       this.drawDivisions();
-      this.drawPlayers();
+      this.syncFromStore();
       this.setupDrawingEngine();
       this.setupResponsiveObserver();
     });
@@ -845,69 +1850,80 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  toggleDrawingMode() {
-    this.isDrawingMode.set(!this.isDrawingMode());
-
-    // Disable dragging on all players when drawing mode is active
-    this.updateDraggable();
-  }
-
   toggleDivisions() {
     this.showDivisions.set(!this.showDivisions());
     this.divisionsLayer.visible(this.showDivisions());
     this.divisionsLayer.batchDraw();
   }
 
-  /**
-   * Tactical zones overlay (hidden by default):
-   *  - five vertical channels: wings, half-spaces and the centre (centre = width of the 6-yard box,
-   *    half-spaces fill the rest of the penalty-area width)
-   *  - attacking thirds
-   *  - both penalty areas tinted
-   */
   private drawDivisions() {
     const W = this.BASE_WIDTH;
     const H = this.BASE_HEIGHT;
-    const centreHalf = 183.2 / 2;     // half the 6-yard box width
-    const boxHalf = 403.2 / 2;        // half the penalty-area width
+    const centreHalf = 183.2 / 2;
+    const boxHalf = 403.2 / 2;
     const cy = H / 2;
-    const lanes = [
-      0,
-      cy - boxHalf,
-      cy - centreHalf,
-      cy + centreHalf,
-      cy + boxHalf,
-      H,
-    ];
+    const lanes = [0, cy - boxHalf, cy - centreHalf, cy + centreHalf, cy + boxHalf, H];
     const laneNames = ['Left wing', 'Left half-space', 'Centre', 'Right half-space', 'Right wing'];
-    const dashed = { stroke: 'rgba(255, 255, 255, 0.55)', strokeWidth: 2, dash: [10, 8], listening: false };
-    const label = { fontSize: 13, fontFamily: 'sans-serif', fontStyle: 'bold', fill: 'rgba(255, 255, 255, 0.75)', listening: false };
+    const dashed = {
+      stroke: 'rgba(255, 255, 255, 0.55)',
+      strokeWidth: 2,
+      dash: [10, 8],
+      listening: false,
+    };
+    const label = {
+      fontSize: 13,
+      fontFamily: 'sans-serif',
+      fontStyle: 'bold',
+      fill: 'rgba(255, 255, 255, 0.75)',
+      listening: false,
+    };
 
-    // Half-space tint (the most valuable channels)
-    [[lanes[1], lanes[2]], [lanes[3], lanes[4]]].forEach(([from, to]) => {
-      this.divisionsLayer.add(new Konva.Rect({ x: 0, y: from, width: W, height: to - from, fill: 'rgba(255, 235, 59, 0.14)', listening: false }));
+    [
+      [lanes[1], lanes[2]],
+      [lanes[3], lanes[4]],
+    ].forEach(([from, to]) => {
+      this.divisionsLayer.add(
+        new Konva.Rect({
+          x: 0,
+          y: from,
+          width: W,
+          height: to - from,
+          fill: 'rgba(255, 235, 59, 0.14)',
+          listening: false,
+        })
+      );
     });
 
-    // Penalty areas
     this.divisionsLayer.add(
-      new Konva.Rect({ x: 0, y: cy - boxHalf, width: 165, height: 403.2, fill: 'rgba(255, 255, 255, 0.10)', listening: false }),
-      new Konva.Rect({ x: W - 165, y: cy - boxHalf, width: 165, height: 403.2, fill: 'rgba(255, 255, 255, 0.10)', listening: false }),
+      new Konva.Rect({
+        x: 0,
+        y: cy - boxHalf,
+        width: 165,
+        height: 403.2,
+        fill: 'rgba(255, 255, 255, 0.10)',
+        listening: false,
+      }),
+      new Konva.Rect({
+        x: W - 165,
+        y: cy - boxHalf,
+        width: 165,
+        height: 403.2,
+        fill: 'rgba(255, 255, 255, 0.10)',
+        listening: false,
+      })
     );
 
-    // Channel lines
-    lanes.slice(1, -1).forEach(y => {
+    lanes.slice(1, -1).forEach((y) => {
       this.divisionsLayer.add(new Konva.Line({ points: [0, y, W, y], ...dashed }));
     });
 
-    // Thirds
-    [W / 3, (2 * W) / 3].forEach(x => {
+    [W / 3, (2 * W) / 3].forEach((x) => {
       this.divisionsLayer.add(new Konva.Line({ points: [x, 0, x, H], ...dashed }));
     });
     ['Defensive third', 'Middle third', 'Final third'].forEach((name, i) => {
       this.divisionsLayer.add(new Konva.Text({ text: name, x: (W / 3) * i + 8, y: 8, ...label }));
     });
 
-    // Channel names, placed just outside the left penalty area so they stay clear of the usual player positions
     laneNames.forEach((name, i) => {
       const mid = (lanes[i] + lanes[i + 1]) / 2;
       this.divisionsLayer.add(new Konva.Text({ text: name, x: 215, y: mid - 7, ...label }));
@@ -922,14 +1938,16 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
       height: container.offsetHeight,
     });
 
-    this.pitchLayer = new Konva.Layer();
-    this.divisionsLayer = new Konva.Layer({ visible: false, listening: false }); // zones sit just above the pitch
-    this.ghostLayer = new Konva.Layer({ listening: false }); // previous-frame ghosts
-    this.drawingLayer = new Konva.Layer(); // Sits below players, above pitch
+    this.pitchLayer = new Konva.Layer({ listening: false });
+    this.divisionsLayer = new Konva.Layer({ visible: false, listening: false });
+    this.shapesLayer = new Konva.Layer();
+    this.ghostLayer = new Konva.Layer({ listening: false });
+    this.drawingLayer = new Konva.Layer();
     this.entityLayer = new Konva.Layer();
 
     this.stage.add(this.pitchLayer);
     this.stage.add(this.divisionsLayer);
+    this.stage.add(this.shapesLayer);
     this.stage.add(this.ghostLayer);
     this.stage.add(this.drawingLayer);
     this.stage.add(this.entityLayer);
@@ -938,202 +1956,589 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
   private setupResponsiveObserver() {
     const container = this.canvasContainer.nativeElement;
     this.resizeObserver = new ResizeObserver(() => {
-      const scale = container.offsetWidth / this.BASE_WIDTH;
-      this.stage.width(this.BASE_WIDTH * scale);
-      this.stage.height(this.BASE_HEIGHT * scale);
-      this.stage.scale({ x: scale, y: scale });
+      this.applyStageViewport();
     });
     this.resizeObserver.observe(container);
   }
 
-  private setupDrawingEngine() {
-    // 1. Start drawing the arrow on mouse/touch down
-    this.stage.on('mousedown touchstart', (e) => {
-      if (!this.isDrawingMode() || this.isPlaying() || this.isExporting()) return;
+  private applyStageViewport() {
+    if (!this.stage || !this.canvasContainer) return;
+    const container = this.canvasContainer.nativeElement;
+    const cw = container.offsetWidth || this.BASE_WIDTH;
+    const view = this.pitchView();
 
-      // Ignore mousedown only if the user clicked on a curve control handle
+    if (view === 'vertical') {
+      // Portrait 680x1050 view: rotate stage 90 deg clockwise around top-right
+      const scale = cw / this.BASE_HEIGHT;
+      this.stage.width(this.BASE_HEIGHT * scale);
+      this.stage.height(this.BASE_WIDTH * scale);
+      this.stage.rotation(90);
+      this.stage.x(this.BASE_HEIGHT * scale);
+      this.stage.y(0);
+      this.stage.scale({ x: scale, y: scale });
+    } else if (view === 'half-left') {
+      const scale = cw / 580;
+      const ch = (cw * 68) / 105;
+      this.stage.width(cw);
+      this.stage.height(ch);
+      this.stage.rotation(0);
+      this.stage.x(0);
+      this.stage.y((ch - this.BASE_HEIGHT * scale) / 2);
+      this.stage.scale({ x: scale, y: scale });
+    } else if (view === 'half-right') {
+      const scale = cw / 580;
+      const ch = (cw * 68) / 105;
+      this.stage.width(cw);
+      this.stage.height(ch);
+      this.stage.rotation(0);
+      this.stage.x(-470 * scale);
+      this.stage.y((ch - this.BASE_HEIGHT * scale) / 2);
+      this.stage.scale({ x: scale, y: scale });
+    } else {
+      const scale = cw / this.BASE_WIDTH;
+      this.stage.width(this.BASE_WIDTH * scale);
+      this.stage.height(this.BASE_HEIGHT * scale);
+      this.stage.rotation(0);
+      this.stage.x(0);
+      this.stage.y(0);
+      this.stage.scale({ x: scale, y: scale });
+    }
+    this.stage.batchDraw();
+  }
+
+  /** Converts pointer position on stage to internal 1050x680 pitch coordinates regardless of view/rotation. */
+  private getInternalPointerPos(): [number, number] | null {
+    const transform = this.stage.getAbsoluteTransform().copy().invert();
+    const pos = this.stage.getPointerPosition();
+    if (!pos) return null;
+    const mapped = transform.point(pos);
+    return [
+      Math.max(0, Math.min(this.BASE_WIDTH, mapped.x)),
+      Math.max(0, Math.min(this.BASE_HEIGHT, mapped.y)),
+    ];
+  }
+
+  private setupDrawingEngine() {
+    this.stage.on('mousedown touchstart', (e) => {
+      if (this.isPlaying() || this.isExporting()) return;
+
+      if (this.activeTool() === 'move') {
+        if (e.target === this.stage) {
+          this.ngZone.run(() => this.selectedEntityId.set(null));
+        }
+        return;
+      }
+
+      if (this.activeTool() === 'eraser') return;
       if (e.target.name() === 'curve-handle') return;
 
-      const pos = this.stage.getPointerPosition();
-      if (!pos) return;
+      const internal = this.getInternalPointerPos();
+      if (!internal) return;
+      const [internalX, internalY] = internal;
 
-      // Divide by scale to map screen pixels to our internal 1050x680 grid
-      const scale = this.stage.scaleX();
-      const internalX = pos.x / scale;
-      const internalY = pos.y / scale;
+      if (this.activeTool() === 'text') {
+        const textVal = this.pendingText().trim();
+        if (textVal) {
+          this.ngZone.run(() => {
+            this.store.addText({
+              x: Math.round(internalX),
+              y: Math.round(internalY),
+              text: textVal,
+              fontSize: this.textSize(),
+              color: this.drawColor(),
+            });
+            this.showStatus('Text label placed (drag in Move mode or click in Eraser mode)');
+          });
+        }
+        return;
+      }
 
       this.currentArrowStart = [internalX, internalY];
       this.currentArrowEnd = [internalX, internalY];
+
+      if (this.activeTool() === 'shape') {
+        this.currentShape = this.createShapeNode({
+          kind: this.shapeKind(),
+          x1: internalX,
+          y1: internalY,
+          x2: internalX,
+          y2: internalY,
+          color: this.drawColor(),
+        });
+        this.shapesLayer.add(this.currentShape);
+        return;
+      }
+
+      this.freehandPoints = [Math.round(internalX), Math.round(internalY)];
       this.currentArrow = this.createArrow({
         points: [internalX, internalY, internalX, internalY],
         style: this.arrowStyle(),
+        color: this.drawColor(),
+        strokeWidth: this.drawWidth(),
+        pathPoints: this.freehandPoints,
       });
 
       this.drawingLayer.add(this.currentArrow);
     });
 
-    // 2. Stretch the arrow as the mouse moves
     this.stage.on('mousemove touchmove', () => {
-      if (!this.isDrawingMode() || !this.currentArrow) return;
-
-      const pos = this.stage.getPointerPosition();
-      if (!pos) return;
-
-      const scale = this.stage.scaleX();
-      const internalX = pos.x / scale;
-      const internalY = pos.y / scale;
+      if (!this.isDrawingMode()) return;
+      const internal = this.getInternalPointerPos();
+      if (!internal) return;
+      const [internalX, internalY] = internal;
 
       this.currentArrowEnd = [internalX, internalY];
       const [x1, y1] = this.currentArrowStart;
+
+      if (this.activeTool() === 'shape' && this.currentShape) {
+        this.currentShape.destroy();
+        this.currentShape = this.createShapeNode({
+          kind: this.shapeKind(),
+          x1,
+          y1,
+          x2: internalX,
+          y2: internalY,
+          color: this.drawColor(),
+        });
+        this.shapesLayer.add(this.currentShape);
+        this.shapesLayer.batchDraw();
+        return;
+      }
+
+      if (!this.currentArrow) return;
+
+      if (this.arrowStyle() === 'freehand') {
+        const lastX = this.freehandPoints[this.freehandPoints.length - 2];
+        const lastY = this.freehandPoints[this.freehandPoints.length - 1];
+        if (Math.hypot(internalX - lastX, internalY - lastY) >= 6) {
+          this.freehandPoints.push(Math.round(internalX), Math.round(internalY));
+        }
+      }
+
       this.updateArrowGroup(
         this.currentArrow,
         [x1, y1, internalX, internalY],
-        this.arrowStyle()
+        this.arrowStyle(),
+        undefined,
+        this.freehandPoints
       );
+      this.drawingLayer.batchDraw();
     });
 
-    // 3. Finish drawing on mouse up
     this.stage.on('mouseup touchend', () => {
+      if (this.activeTool() === 'shape' && this.currentShape) {
+        const shape = this.currentShape;
+        this.currentShape = null;
+        shape.destroy();
+        const [x1, y1] = this.currentArrowStart;
+        const [x2, y2] = this.currentArrowEnd;
+        if (Math.hypot(x2 - x1, y2 - y1) < 12) {
+          this.shapesLayer.batchDraw();
+          return;
+        }
+        this.ngZone.run(() =>
+          this.store.addShape({
+            kind: this.shapeKind(),
+            x1: Math.round(x1),
+            y1: Math.round(y1),
+            x2: Math.round(x2),
+            y2: Math.round(y2),
+            color: this.drawColor(),
+          })
+        );
+        return;
+      }
+
       const arrow = this.currentArrow;
       if (!arrow) return;
       this.currentArrow = null;
 
       const [x1, y1] = this.currentArrowStart;
       const [x2, y2] = this.currentArrowEnd;
-      arrow.destroy(); // the store-driven effect re-renders committed arrows
-      if (Math.hypot(x2 - x1, y2 - y1) < 10) {
+      arrow.destroy();
+      if (Math.hypot(x2 - x1, y2 - y1) < 10 && this.freehandPoints.length < 6) {
         this.drawingLayer.batchDraw();
-        return; // ignore accidental taps
+        return;
       }
+      const savedFreehand =
+        this.arrowStyle() === 'freehand' ? [...this.freehandPoints] : undefined;
       this.ngZone.run(() =>
         this.store.addArrow(
           [Math.round(x1), Math.round(y1), Math.round(x2), Math.round(y2)],
-          this.arrowStyle()
+          this.arrowStyle(),
+          {
+            color: this.drawColor(),
+            strokeWidth: this.drawWidth(),
+            pathPoints: savedFreehand,
+          }
         )
       );
     });
   }
 
   private drawPitch() {
-    const turf = new Konva.Rect({ x: 0, y: 0, width: this.BASE_WIDTH, height: this.BASE_HEIGHT, fill: '#2e7d32', listening: false });
-    const lineConfig = { stroke: 'rgba(255, 255, 255, 0.7)', strokeWidth: 3, listening: false };
+    this.pitchLayer.destroyChildren();
+    const W = this.BASE_WIDTH;
+    const H = this.BASE_HEIGHT;
 
-    const boundary = new Konva.Rect({ x: 0, y: 0, width: this.BASE_WIDTH, height: this.BASE_HEIGHT, ...lineConfig });
-    const halfwayLine = new Konva.Line({ points: [this.BASE_WIDTH / 2, 0, this.BASE_WIDTH / 2, this.BASE_HEIGHT], ...lineConfig });
-    const centerCircle = new Konva.Circle({ x: this.BASE_WIDTH / 2, y: this.BASE_HEIGHT / 2, radius: 91.5, ...lineConfig });
-    const leftBox = new Konva.Rect({ x: 0, y: (this.BASE_HEIGHT - 403.2) / 2, width: 165, height: 403.2, ...lineConfig });
-    const rightBox = new Konva.Rect({ x: this.BASE_WIDTH - 165, y: (this.BASE_HEIGHT - 403.2) / 2, width: 165, height: 403.2, ...lineConfig });
-    const leftGoalArea = new Konva.Rect({ x: 0, y: (this.BASE_HEIGHT - 183.2) / 2, width: 55, height: 183.2, ...lineConfig });
-    const rightGoalArea = new Konva.Rect({ x: this.BASE_WIDTH - 55, y: (this.BASE_HEIGHT - 183.2) / 2, width: 55, height: 183.2, ...lineConfig });
+    // Base turf
+    this.pitchLayer.add(
+      new Konva.Rect({ x: 0, y: 0, width: W, height: H, fill: '#2e7d32', listening: false })
+    );
 
-    this.pitchLayer.add(turf, boundary, halfwayLine, centerCircle, leftBox, rightBox, leftGoalArea, rightGoalArea);
+    // Mowed stadium grass stripes (10 vertical bands)
+    if (this.showStripes()) {
+      const stripeCount = 10;
+      const stripeW = W / stripeCount;
+      for (let i = 0; i < stripeCount; i++) {
+        if (i % 2 === 1) {
+          this.pitchLayer.add(
+            new Konva.Rect({
+              x: i * stripeW,
+              y: 0,
+              width: stripeW,
+              height: H,
+              fill: 'rgba(0, 0, 0, 0.065)',
+              listening: false,
+            })
+          );
+        }
+      }
+    }
+
+    if (!this.showMarkings()) return;
+
+    const lineConfig = { stroke: 'rgba(255, 255, 255, 0.78)', strokeWidth: 3, listening: false };
+
+    const boundary = new Konva.Rect({ x: 0, y: 0, width: W, height: H, ...lineConfig });
+    const halfwayLine = new Konva.Line({ points: [W / 2, 0, W / 2, H], ...lineConfig });
+    const centerCircle = new Konva.Circle({ x: W / 2, y: H / 2, radius: 91.5, ...lineConfig });
+    const centerSpot = new Konva.Circle({
+      x: W / 2,
+      y: H / 2,
+      radius: 4,
+      fill: 'rgba(255, 255, 255, 0.85)',
+      listening: false,
+    });
+
+    const leftBox = new Konva.Rect({ x: 0, y: (H - 403.2) / 2, width: 165, height: 403.2, ...lineConfig });
+    const rightBox = new Konva.Rect({
+      x: W - 165,
+      y: (H - 403.2) / 2,
+      width: 165,
+      height: 403.2,
+      ...lineConfig,
+    });
+    const leftGoalArea = new Konva.Rect({ x: 0, y: (H - 183.2) / 2, width: 55, height: 183.2, ...lineConfig });
+    const rightGoalArea = new Konva.Rect({
+      x: W - 55,
+      y: (H - 183.2) / 2,
+      width: 55,
+      height: 183.2,
+      ...lineConfig,
+    });
+
+    // Penalty spots & penalty arcs
+    const leftPenSpot = new Konva.Circle({
+      x: 110,
+      y: H / 2,
+      radius: 3.5,
+      fill: 'rgba(255, 255, 255, 0.85)',
+      listening: false,
+    });
+    const rightPenSpot = new Konva.Circle({
+      x: W - 110,
+      y: H / 2,
+      radius: 3.5,
+      fill: 'rgba(255, 255, 255, 0.85)',
+      listening: false,
+    });
+    const leftArc = new Konva.Arc({
+      x: 110,
+      y: H / 2,
+      innerRadius: 91.5,
+      outerRadius: 91.5,
+      angle: 106,
+      rotation: -53,
+      ...lineConfig,
+    });
+    const rightArc = new Konva.Arc({
+      x: W - 110,
+      y: H / 2,
+      innerRadius: 91.5,
+      outerRadius: 91.5,
+      angle: 106,
+      rotation: 127,
+      ...lineConfig,
+    });
+
+    // 3D Goal Nets along both goal lines
+    const goalH = 73.2;
+    const goalY = (H - goalH) / 2;
+    const leftNet = new Konva.Rect({
+      x: 0,
+      y: goalY,
+      width: 14,
+      height: goalH,
+      fill: 'rgba(255, 255, 255, 0.14)',
+      stroke: 'rgba(255, 255, 255, 0.9)',
+      strokeWidth: 2,
+      listening: false,
+    });
+    const rightNet = new Konva.Rect({
+      x: W - 14,
+      y: goalY,
+      width: 14,
+      height: goalH,
+      fill: 'rgba(255, 255, 255, 0.14)',
+      stroke: 'rgba(255, 255, 255, 0.9)',
+      strokeWidth: 2,
+      listening: false,
+    });
+
+    this.pitchLayer.add(
+      boundary,
+      halfwayLine,
+      centerCircle,
+      centerSpot,
+      leftBox,
+      rightBox,
+      leftGoalArea,
+      rightGoalArea,
+      leftPenSpot,
+      rightPenSpot,
+      leftArc,
+      rightArc,
+      leftNet,
+      rightNet
+    );
   }
 
   /** Classic black & white football: white sphere, black centre pentagon, surrounding patches. */
   private addClassicBall(group: Konva.Group, r: number) {
     group.add(new Konva.Circle({ radius: r, fill: '#ffffff', stroke: '#111111', strokeWidth: 1.5 }));
 
-    // Pattern is clipped to the sphere so outer pentagons are cut by the edge (3D look)
     const pattern = new Konva.Group({
-      clipFunc: (ctx) => { ctx.arc(0, 0, r, 0, Math.PI * 2, false); }
+      clipFunc: (ctx) => {
+        ctx.arc(0, 0, r, 0, Math.PI * 2, false);
+      },
     });
     const black = '#111111';
-    const rad = (deg: number) => deg * Math.PI / 180;
-    const pt = (deg: number, dist: number) => ({ x: Math.cos(rad(deg)) * dist, y: Math.sin(rad(deg)) * dist });
+    const rad = (deg: number) => (deg * Math.PI) / 180;
+    const pt = (deg: number, dist: number) => ({
+      x: Math.cos(rad(deg)) * dist,
+      y: Math.sin(rad(deg)) * dist,
+    });
 
     for (let i = 0; i < 5; i++) {
-      const a = i * 72 - 90;          // direction of a centre-pentagon vertex
+      const a = i * 72 - 90;
       const next = a + 72;
       const inner = pt(a, r * 0.38);
       const outer = pt(a, r * 0.78);
       const outerNext = pt(next, r * 0.78);
       const mid = pt(a + 36, r * 0.62);
 
-      // Seam from each centre-pentagon corner out to the outer pentagon
-      pattern.add(new Konva.Line({ points: [inner.x, inner.y, outer.x, outer.y], stroke: black, strokeWidth: 1 }));
-      // Hexagon outline between neighbouring outer pentagons
-      pattern.add(new Konva.Line({
-        points: [outer.x, outer.y, mid.x, mid.y, outerNext.x, outerNext.y],
-        stroke: black, strokeWidth: 1, lineJoin: 'round',
-      }));
-      // Outer pentagon, pushed to the rim and cut by the clip
+      pattern.add(
+        new Konva.Line({ points: [inner.x, inner.y, outer.x, outer.y], stroke: black, strokeWidth: 1 })
+      );
+      pattern.add(
+        new Konva.Line({
+          points: [outer.x, outer.y, mid.x, mid.y, outerNext.x, outerNext.y],
+          stroke: black,
+          strokeWidth: 1,
+          lineJoin: 'round',
+        })
+      );
       const rim = pt(a, r * 1.02);
-      pattern.add(new Konva.RegularPolygon({
-        x: rim.x, y: rim.y, sides: 5, radius: r * 0.42,
-        rotation: a + 90 + 180, // point toward the centre
-        fill: black,
-      }));
+      pattern.add(
+        new Konva.RegularPolygon({
+          x: rim.x,
+          y: rim.y,
+          sides: 5,
+          radius: r * 0.42,
+          rotation: a + 90 + 180,
+          fill: black,
+        })
+      );
     }
 
-    // Centre pentagon
     pattern.add(new Konva.RegularPolygon({ sides: 5, radius: r * 0.38, fill: black }));
     group.add(pattern);
-
-    // Outline drawn on top so the clipped edge stays crisp
     group.add(new Konva.Circle({ radius: r, stroke: black, strokeWidth: 1.5 }));
   }
 
-  private drawPlayers() {
-    const entities = this.store.entities();
+  /** Synchronizes Konva entity nodes with BoardStore entities while preserving node references for tweens. */
+  private syncEntities(entities: TacticalEntity[]) {
+    if (!this.entityLayer) return;
+    const wantedIds = new Set(entities.map((e) => e.id));
 
-    entities.forEach(entity => {
+    // Remove deleted nodes
+    this.entityLayer
+      .getChildren()
+      .slice()
+      .forEach((child) => {
+        if (!wantedIds.has(child.id())) child.destroy();
+      });
+
+    const isMove = this.activeTool() === 'move' && !this.isPlaying() && !this.isExporting();
+    const isEraser = this.activeTool() === 'eraser' && !this.isPlaying() && !this.isExporting();
+    this.entityLayer.listening(isMove || isEraser);
+
+    entities.forEach((entity) => {
+      let group = this.entityLayer.findOne<Konva.Group>('#' + entity.id);
       const isBall = entity.type === 'ball';
+      const isEquip = entity.type === 'equipment';
       const radius = isBall ? 13 : 15;
 
-      const group = new Konva.Group({
-        id: entity.id,
-        x: entity.x,
-        y: entity.y,
-        draggable: true,
-        dragBoundFunc: (pos) => {
-          const scale = this.stage.scaleX();
-          const minX = radius * scale;
-          const maxX = (this.BASE_WIDTH * scale) - (radius * scale);
-          const minY = radius * scale;
-          const maxY = (this.BASE_HEIGHT * scale) - (radius * scale);
-          return { x: Math.max(minX, Math.min(pos.x, maxX)), y: Math.max(minY, Math.min(pos.y, maxY)) };
-        }
-      });
+      if (!group) {
+        group = new Konva.Group({
+          id: entity.id,
+          x: entity.x,
+          y: entity.y,
+          draggable: isMove,
+          dragBoundFunc: (pos) => {
+            const scale = this.stage.scaleX();
+            const minX = radius * scale;
+            const maxX = this.BASE_WIDTH * scale - radius * scale;
+            const minY = radius * scale;
+            const maxY = this.BASE_HEIGHT * scale - radius * scale;
+            return {
+              x: Math.max(minX, Math.min(pos.x, maxX)),
+              y: Math.max(minY, Math.min(pos.y, maxY)),
+            };
+          },
+        });
+
+        group.on('dragend', () => {
+          const newPos = group!.position();
+          this.ngZone.run(() => {
+            this.store.updatePosition(entity.id, Math.round(newPos.x), Math.round(newPos.y));
+          });
+        });
+
+        group.on('click tap contextmenu', (e) => {
+          e.evt?.preventDefault?.();
+          if (this.activeTool() === 'eraser') {
+            if (entity.id !== 'ball') {
+              e.cancelBubble = true;
+              this.ngZone.run(() => this.store.removeEntity(entity.id));
+            }
+            return;
+          }
+          if (this.activeTool() === 'move') {
+            e.cancelBubble = true;
+            this.ngZone.run(() => this.selectedEntityId.set(entity.id));
+          }
+        });
+
+        this.entityLayer.add(group);
+      }
+
+      group.position({ x: entity.x, y: entity.y });
+      group.rotation(isEquip ? entity.rotation ?? 0 : 0);
+      group.draggable(isMove);
+      group.destroyChildren();
+
+      // Selection ring when inspected
+      if (this.selectedEntityId() === entity.id && !this.isPlaying() && !this.isExporting()) {
+        group.add(
+          new Konva.Circle({
+            radius: radius + 6,
+            stroke: '#fbbf24',
+            strokeWidth: 2,
+            dash: [4, 3],
+            listening: false,
+          })
+        );
+      }
+
+      // Vision cone / orientation indicator for players
+      if (!isBall && !isEquip && entity.showVision) {
+        const facing = entity.facing ?? (entity.type === 'away' ? 180 : 0);
+        group.add(
+          new Konva.Wedge({
+            radius: 56,
+            angle: 64,
+            rotation: facing - 32,
+            fill: 'rgba(250, 204, 21, 0.22)',
+            stroke: 'rgba(250, 204, 21, 0.55)',
+            strokeWidth: 1,
+            listening: false,
+          })
+        );
+      }
 
       if (isBall) {
         this.addClassicBall(group, radius);
+      } else if (isEquip && entity.equipmentKind) {
+        renderEquipmentShape(group, entity.equipmentKind, entity.color ?? '#f97316');
       } else {
-        group.add(new Konva.Circle({
-          radius: radius,
-          fill: entity.type === 'home' ? '#e74c3c' : '#3498db',
-          stroke: entity.type === 'home' ? '#c0392b' : '#2980b9',
-          strokeWidth: 2,
-        }));
+        const fill =
+          entity.color ??
+          (entity.type === 'home'
+            ? this.store.homeColor()
+            : entity.type === 'away'
+              ? this.store.awayColor()
+              : '#eab308');
+        group.add(
+          new Konva.Circle({
+            radius: radius,
+            fill,
+            stroke: '#ffffff',
+            strokeWidth: 2,
+          })
+        );
       }
 
-      if (!isBall && entity.label) {
-        const text = new Konva.Text({
-          text: entity.label,
-          fontSize: 14,
-          fontFamily: 'sans-serif',
-          fill: '#ffffff',
-          fontStyle: 'bold',
-          width: radius * 2,
-          height: radius * 2,
-          offsetX: radius,
-          offsetY: radius,
-          align: 'center',
-          verticalAlign: 'middle'
-        });
-        group.add(text);
+      if (!isBall && !isEquip && entity.label) {
+        group.add(
+          new Konva.Text({
+            text: entity.label,
+            fontSize: 13,
+            fontFamily: 'sans-serif',
+            fill: entity.type === 'referee' ? '#111827' : '#ffffff',
+            fontStyle: 'bold',
+            width: radius * 2,
+            height: radius * 2,
+            offsetX: radius,
+            offsetY: radius,
+            align: 'center',
+            verticalAlign: 'middle',
+            listening: false,
+          })
+        );
       }
 
-      group.on('mouseenter', () => { if (!this.isDrawingMode()) this.stage.container().style.cursor = 'grab'; });
-      group.on('mouseleave', () => { if (!this.isDrawingMode()) this.stage.container().style.cursor = 'default'; });
-      group.on('mousedown', () => { if (!this.isDrawingMode()) this.stage.container().style.cursor = 'grabbing'; });
-      group.on('mouseup', () => { if (!this.isDrawingMode()) this.stage.container().style.cursor = 'grab'; });
-
-      group.on('dragend', () => {
-        const newPos = group.position();
-        this.ngZone.run(() => this.store.updatePosition(entity.id, Math.round(newPos.x), Math.round(newPos.y)));
-      });
-
-      this.entityLayer.add(group);
+      // Player Name / Role tag rendered beneath the token
+      if (!isBall && !isEquip && entity.name?.trim()) {
+        const nameStr = entity.name.trim();
+        const tagW = Math.max(38, nameStr.length * 6.8 + 10);
+        group.add(
+          new Konva.Rect({
+            x: -tagW / 2,
+            y: radius + 3,
+            width: tagW,
+            height: 15,
+            fill: 'rgba(17, 24, 39, 0.85)',
+            cornerRadius: 3,
+            listening: false,
+          }),
+          new Konva.Text({
+            x: -tagW / 2,
+            y: radius + 3,
+            width: tagW,
+            height: 15,
+            text: nameStr,
+            fontSize: 10,
+            fontFamily: 'sans-serif',
+            fontStyle: 'bold',
+            fill: '#f9fafb',
+            align: 'center',
+            verticalAlign: 'middle',
+            listening: false,
+          })
+        );
+      }
     });
   }
 }
