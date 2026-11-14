@@ -87,10 +87,15 @@ export const CURSORS = {
   ),
 };
 
-/** Pitch goal mouth (internal 1050x680 coordinates). */
+/** Pitch goal mouth and outer apron margins (internal 1050x680 coordinates). */
 const GOAL_WIDTH = 73.2;
 const GOAL_TOP = (680 - GOAL_WIDTH) / 2;
-const GOAL_DEPTH = 18;
+const GOAL_DEPTH = 20;
+const PITCH_PAD_X = 36;
+const PITCH_PAD_Y = 24;
+const FULL_VIEW_W = 1050 + PITCH_PAD_X * 2; // 1122
+const FULL_VIEW_H = 680 + PITCH_PAD_Y * 2; // 728
+const HALF_VIEW_W = PITCH_PAD_X + 525 + 6; // 567 (outer apron + protruding goal net -> halfway line)
 
 @Component({
   selector: 'app-pitch-board',
@@ -594,17 +599,17 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
 
   containerAspect = computed(() => {
     const v = this.pitchView();
-    if (v === 'vertical') return '680 / 1050';
-    if (v === 'half-left' || v === 'half-right') return '580 / 680';
-    return '1050 / 680';
+    if (v === 'vertical') return `${FULL_VIEW_H} / ${FULL_VIEW_W}`;
+    if (v === 'half-left' || v === 'half-right') return `${HALF_VIEW_W} / ${FULL_VIEW_H}`;
+    return `${FULL_VIEW_W} / ${FULL_VIEW_H}`;
   });
 
   containerMaxWidth = computed(() => {
     const z = this.boardZoom();
     const v = this.pitchView();
-    if (v === 'vertical') return `min(${Math.round(480 * z)}px, calc((100dvh - 210px) * 0.647 * ${z}))`;
-    if (v === 'half-left' || v === 'half-right') return `min(${Math.round(540 * z)}px, calc((100dvh - 210px) * 0.853 * ${z}))`;
-    return `min(${Math.round(900 * z)}px, calc((100dvh - 210px) * 1.544 * ${z}))`;
+    if (v === 'vertical') return `min(${Math.round(490 * z)}px, calc((100dvh - 210px) * 0.648 * ${z}))`;
+    if (v === 'half-left' || v === 'half-right') return `min(${Math.round(550 * z)}px, calc((100dvh - 210px) * 0.779 * ${z}))`;
+    return `min(${Math.round(920 * z)}px, calc((100dvh - 210px) * 1.541 * ${z}))`;
   });
 
   selectedEntityId = signal<string | null>(null);
@@ -834,33 +839,33 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     });
   }
 
-  /** Highlights the left or right goal net and renders a "GOAL!" celebration badge when a ball is inside the goal mouth. */
+  /** Highlights the left or right protruding goal net and renders a "GOAL!" celebration badge when a ball enters the goal mouth. */
   private renderGoalScoredOverlay(entities: TacticalEntity[]) {
     const balls = entities.filter((e) => e.type === 'ball');
     const uprightRot = this.uprightRotation();
     const checkGoal = (side: 'left' | 'right') => {
       const scored = balls.some((b) =>
         side === 'left'
-          ? b.x <= GOAL_DEPTH + 6 && b.y >= GOAL_TOP - 4 && b.y <= GOAL_TOP + GOAL_WIDTH + 4
-          : b.x >= this.BASE_WIDTH - GOAL_DEPTH - 6 && b.y >= GOAL_TOP - 4 && b.y <= GOAL_TOP + GOAL_WIDTH + 4
+          ? b.x <= 12 && b.y >= GOAL_TOP - 4 && b.y <= GOAL_TOP + GOAL_WIDTH + 4
+          : b.x >= this.BASE_WIDTH - 12 && b.y >= GOAL_TOP - 4 && b.y <= GOAL_TOP + GOAL_WIDTH + 4
       );
       if (!scored) return;
 
-      const gx = side === 'left' ? 0 : this.BASE_WIDTH - GOAL_DEPTH;
+      const gx = side === 'left' ? -GOAL_DEPTH : this.BASE_WIDTH;
       this.drawingLayer.add(
         new Konva.Rect({
           x: gx,
           y: GOAL_TOP,
           width: GOAL_DEPTH,
           height: GOAL_WIDTH,
-          fill: 'rgba(250, 204, 21, 0.38)',
+          fill: 'rgba(250, 204, 21, 0.42)',
           stroke: '#facc15',
           strokeWidth: 3,
           listening: false,
         })
       );
 
-      const badgeX = side === 'left' ? 42 : this.BASE_WIDTH - 42;
+      const badgeX = side === 'left' ? 38 : this.BASE_WIDTH - 38;
       const badgeY = GOAL_TOP - 18;
       const badge = new Konva.Group({
         x: badgeX,
@@ -2148,57 +2153,66 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
   private applyStageViewport() {
     if (!this.stage || !this.canvasContainer) return;
     const container = this.canvasContainer.nativeElement;
-    const cw = container.offsetWidth || this.BASE_WIDTH;
+    const cw = container.offsetWidth || FULL_VIEW_W;
     const view = this.pitchView();
 
     if (view === 'vertical') {
-      // Portrait 680x1050 view: rotate stage 90 deg clockwise around top-right
-      const scale = cw / this.BASE_HEIGHT;
-      this.stage.width(this.BASE_HEIGHT * scale);
-      this.stage.height(this.BASE_WIDTH * scale);
+      // Portrait 728x1122 view (including outer apron + protruding top/bottom goal nets)
+      const scale = cw / FULL_VIEW_H;
+      this.stage.width(FULL_VIEW_H * scale);
+      this.stage.height(FULL_VIEW_W * scale);
       this.stage.rotation(90);
-      this.stage.x(this.BASE_HEIGHT * scale);
-      this.stage.y(0);
+      this.stage.x((this.BASE_HEIGHT + PITCH_PAD_Y) * scale);
+      this.stage.y(PITCH_PAD_X * scale);
       this.stage.scale({ x: scale, y: scale });
     } else if (view === 'half-left') {
-      // Full half-pitch (580x680 including center circle) fitted cleanly from top touchline to bottom touchline
-      const scale = cw / 580;
-      const ch = this.BASE_HEIGHT * scale;
+      // Left half-pitch from outer left apron + protruding goal net (-36) to halfway line (+6)
+      const scale = cw / HALF_VIEW_W;
+      const ch = FULL_VIEW_H * scale;
       this.stage.width(cw);
       this.stage.height(ch);
       this.stage.rotation(0);
-      this.stage.x(0);
-      this.stage.y(0);
+      this.stage.x(PITCH_PAD_X * scale);
+      this.stage.y(PITCH_PAD_Y * scale);
       this.stage.scale({ x: scale, y: scale });
     } else if (view === 'half-right') {
-      // Right half-pitch (x: 470..1050, y: 0..680) fitted cleanly from top touchline to bottom touchline
-      const scale = cw / 580;
-      const ch = this.BASE_HEIGHT * scale;
+      // Right half-pitch from halfway line (525 - 6) to outer right apron + protruding goal net (1050 + 36)
+      const scale = cw / HALF_VIEW_W;
+      const ch = FULL_VIEW_H * scale;
       this.stage.width(cw);
       this.stage.height(ch);
       this.stage.rotation(0);
-      this.stage.x(-470 * scale);
-      this.stage.y(0);
+      this.stage.x(-(this.BASE_WIDTH / 2 - 6) * scale);
+      this.stage.y(PITCH_PAD_Y * scale);
       this.stage.scale({ x: scale, y: scale });
     } else {
-      const scale = cw / this.BASE_WIDTH;
-      this.stage.width(this.BASE_WIDTH * scale);
-      this.stage.height(this.BASE_HEIGHT * scale);
+      // Full horizontal pitch including outer apron and both protruding goal nets
+      const scale = cw / FULL_VIEW_W;
+      this.stage.width(FULL_VIEW_W * scale);
+      this.stage.height(FULL_VIEW_H * scale);
       this.stage.rotation(0);
-      this.stage.x(0);
-      this.stage.y(0);
+      this.stage.x(PITCH_PAD_X * scale);
+      this.stage.y(PITCH_PAD_Y * scale);
       this.stage.scale({ x: scale, y: scale });
     }
     this.stage.batchDraw();
   }
 
-  /** Clamps a Konva dragBoundFunc screen position into internal [margin, 1050-margin] x [margin, 680-margin] across all views. */
-  private clampStageDragPos(pos: { x: number; y: number }, margin: number): { x: number; y: number } {
+  /** Clamps a Konva dragBoundFunc screen position into internal pitch coordinates (allowing the ball into protruding goal nets). */
+  private clampStageDragPos(
+    pos: { x: number; y: number },
+    margin: number,
+    allowGoalNet = false
+  ): { x: number; y: number } {
     const absTransform = this.stage.getAbsoluteTransform();
     const inv = absTransform.copy().invert();
     const internal = inv.point(pos);
+    const inGoalY =
+      allowGoalNet && internal.y >= GOAL_TOP + 6 && internal.y <= GOAL_TOP + GOAL_WIDTH - 6;
+    const minX = inGoalY ? -GOAL_DEPTH + 6 : margin;
+    const maxX = inGoalY ? this.BASE_WIDTH + GOAL_DEPTH - 6 : this.BASE_WIDTH - margin;
     const clamped = {
-      x: Math.max(margin, Math.min(this.BASE_WIDTH - margin, internal.x)),
+      x: Math.max(minX, Math.min(maxX, internal.x)),
       y: Math.max(margin, Math.min(this.BASE_HEIGHT - margin, internal.y)),
     };
     return absTransform.point(clamped);
@@ -2210,8 +2224,11 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     const pos = this.stage.getPointerPosition();
     if (!pos) return null;
     const mapped = transform.point(pos);
+    const inGoalY = mapped.y >= GOAL_TOP && mapped.y <= GOAL_TOP + GOAL_WIDTH;
+    const minX = inGoalY ? -GOAL_DEPTH : 0;
+    const maxX = inGoalY ? this.BASE_WIDTH + GOAL_DEPTH : this.BASE_WIDTH;
     return [
-      Math.max(0, Math.min(this.BASE_WIDTH, mapped.x)),
+      Math.max(minX, Math.min(maxX, mapped.x)),
       Math.max(0, Math.min(this.BASE_HEIGHT, mapped.y)),
     ];
   }
@@ -2379,9 +2396,21 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     const W = this.BASE_WIDTH;
     const H = this.BASE_HEIGHT;
 
-    // Base turf
+    // Outer stadium apron / run-off surround (outside the white boundary lines, where goal nets protrude)
     this.pitchLayer.add(
-      new Konva.Rect({ x: 0, y: 0, width: W, height: H, fill: '#2e7d32', listening: false })
+      new Konva.Rect({
+        x: -PITCH_PAD_X,
+        y: -PITCH_PAD_Y,
+        width: FULL_VIEW_W,
+        height: FULL_VIEW_H,
+        fill: '#4b633b',
+        listening: false,
+      })
+    );
+
+    // In-bounds pitch turf
+    this.pitchLayer.add(
+      new Konva.Rect({ x: 0, y: 0, width: W, height: H, fill: '#357a38', listening: false })
     );
 
     // Mowed stadium grass stripes (10 vertical bands)
@@ -2396,7 +2425,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
               y: 0,
               width: stripeW,
               height: H,
-              fill: 'rgba(0, 0, 0, 0.065)',
+              fill: 'rgba(0, 0, 0, 0.075)',
               listening: false,
             })
           );
@@ -2406,7 +2435,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
 
     if (!this.showMarkings()) return;
 
-    const lineConfig = { stroke: 'rgba(255, 255, 255, 0.78)', strokeWidth: 3, listening: false };
+    const lineConfig = { stroke: '#ffffff', strokeWidth: 3.5, listening: false };
 
     const boundary = new Konva.Rect({ x: 0, y: 0, width: W, height: H, ...lineConfig });
     const halfwayLine = new Konva.Line({ points: [W / 2, 0, W / 2, H], ...lineConfig });
@@ -2415,7 +2444,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
       x: W / 2,
       y: H / 2,
       radius: 4,
-      fill: 'rgba(255, 255, 255, 0.85)',
+      fill: '#ffffff',
       listening: false,
     });
 
@@ -2440,15 +2469,15 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     const leftPenSpot = new Konva.Circle({
       x: 110,
       y: H / 2,
-      radius: 3.5,
-      fill: 'rgba(255, 255, 255, 0.85)',
+      radius: 3.8,
+      fill: '#ffffff',
       listening: false,
     });
     const rightPenSpot = new Konva.Circle({
       x: W - 110,
       y: H / 2,
-      radius: 3.5,
-      fill: 'rgba(255, 255, 255, 0.85)',
+      radius: 3.8,
+      fill: '#ffffff',
       listening: false,
     });
     const leftArc = new Konva.Arc({
@@ -2470,8 +2499,8 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
       ...lineConfig,
     });
 
-    // Woven 3D Goal Nets along both goal lines
-    const buildGoalNet = (gx: number, isLeft: boolean): Konva.Group => {
+    // Protruding Woven Goal Nets OUTSIDE the left (x: -GOAL_DEPTH..0) and right (x: W..W+GOAL_DEPTH) goal lines
+    const buildGoalNet = (gx: number): Konva.Group => {
       const netGroup = new Konva.Group({ listening: false });
       const nw = GOAL_DEPTH;
       const nh = GOAL_WIDTH;
@@ -2482,44 +2511,41 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
           y: ny,
           width: nw,
           height: nh,
-          fill: 'rgba(255, 255, 255, 0.16)',
-          stroke: 'rgba(255, 255, 255, 0.92)',
-          strokeWidth: 2.2,
+          fill: 'rgba(15, 23, 42, 0.22)',
+          stroke: '#ffffff',
+          strokeWidth: 3,
+          lineJoin: 'miter',
         })
       );
-      // Horizontal mesh threads
-      for (let y = ny + 8; y < ny + nh; y += 8) {
+      // Dense horizontal net rungs (matching coaching board goal net style)
+      for (let y = ny + 4.5; y < ny + nh - 2; y += 4.5) {
         netGroup.add(
           new Konva.Line({
             points: [gx, y, gx + nw, y],
-            stroke: 'rgba(255, 255, 255, 0.38)',
-            strokeWidth: 1,
+            stroke: 'rgba(255, 255, 255, 0.72)',
+            strokeWidth: 1.1,
           })
         );
       }
-      // Vertical mesh threads
+      // Vertical net mesh cords
       for (let x = gx + 5; x < gx + nw; x += 5) {
         netGroup.add(
           new Konva.Line({
             points: [x, ny, x, ny + nh],
-            stroke: 'rgba(255, 255, 255, 0.38)',
+            stroke: 'rgba(255, 255, 255, 0.55)',
             strokeWidth: 1,
           })
         );
       }
-      // Goalpost circles on the goal line
-      const postX = isLeft ? gx : gx + nw;
-      netGroup.add(
-        new Konva.Circle({ x: postX, y: ny, radius: 3.5, fill: '#ffffff', stroke: '#111827', strokeWidth: 1 }),
-        new Konva.Circle({ x: postX, y: ny + nh, radius: 3.5, fill: '#ffffff', stroke: '#111827', strokeWidth: 1 })
-      );
       return netGroup;
     };
 
-    const leftNet = buildGoalNet(0, true);
-    const rightNet = buildGoalNet(W - GOAL_DEPTH, false);
+    const leftNet = buildGoalNet(-GOAL_DEPTH);
+    const rightNet = buildGoalNet(W);
 
     this.pitchLayer.add(
+      leftNet,
+      rightNet,
       boundary,
       halfwayLine,
       centerCircle,
@@ -2531,9 +2557,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
       leftPenSpot,
       rightPenSpot,
       leftArc,
-      rightArc,
-      leftNet,
-      rightNet
+      rightArc
     );
   }
 
@@ -2620,7 +2644,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
           x: entity.x,
           y: entity.y,
           draggable: isMove,
-          dragBoundFunc: (pos) => this.clampStageDragPos(pos, radius),
+          dragBoundFunc: (pos) => this.clampStageDragPos(pos, radius, isBall),
         });
 
         group.on('mouseenter', () => {
