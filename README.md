@@ -16,11 +16,11 @@ A modern, responsive, browser-based football tactical board for match analysis, 
 - **5 Squad & Drill Modes (`Mode:` selector):** Switch between **`11v11 Full Match`**, **`9v9 Youth / Tactical`**, **`7v7 Small-Sided`**, **`5v5 Futsal / Drill`**, or **`Empty Pitch (Free Build)`** (clears the field so coaches can drag out just 2–3 players, balls, and cones to explain specific drills).
 - **7 Built-in 11v11 Formations** for both Home and Away teams (`4-3-3`, `4-2-3-1`, `4-4-2`, `3-5-2`, `3-4-3`, `5-3-2`, `4-1-4-1`) — switch formations at any time while preserving player names, jersey numbers, and vision settings.
 - **Custom Team Colors:** Live color pickers for both Home and Away kits.
-- **4 Pitch Views & Expanded Zoom (`70%` – `200%`):**
+- **4 Pitch Views & Smooth Linear Zoom Engine (`70%` – `200%`):**
   - `Full Horizontal` (standard 105×68 m view with outer stadium apron and protruding woven goal nets)
   - `Half Pitch (Left)` & `Half Pitch (Right)` (framed from outer goal net to the halfway line for set pieces and pressing traps)
   - `Full Vertical` (coach's touchline / behind-goal perspective with counter-rotated upright player numbers, names, Referee `R`, and cones)
-  - **Expanded Zoom (`- / +` & `70%` up to `200%`):** Scale the board from compact `70%` (`90% (Fit)` default) up to `200%` close-up.
+  - **Smooth Linear Zoom Engine (`− / +` buttons & 14 presets):** Scale the pitch continuously from compact `70%` up to `200%` close-up (`70%`, `80%`, `85%`, `90% (Fit)`, `95%`, `100%`, `105%`, `110%`, `115%`, `120%`, `130%`, `150%`, `175%`, `200%`) with proportional base-width scaling across every step.
   - Toggleable **Mowed Grass Stripes**, **Pitch Lines (Markings)**, penalty spots, penalty arcs, and **Protruding Woven Goal Nets** (dragging the ball inside either goal net triggers a live **`⚽ GOAL!`** celebration banner).
 - **Interactive 6-Step Feature Tour (`? Tour`) & Built-In Animated Demos (`Demos (3)`):**
   - Step-by-step interactive onboarding tour with one-click **"Try It"** actions.
@@ -61,9 +61,10 @@ Expand **`+ Equipment & Bench`** (or switch `Mode:` to **`Empty Pitch (Free Buil
 - **9 Draggable Vector Training Equipment Items:**
   - `Cone`, `Marker Disc`, `Hurdle`, `Agility Ladder`, `Slalom Pole`, `Mannequin Wall`, `Training Ring`, rotatable `Mini-Goal`, and `Goal Net (Scored!)`
 - **Live Goal Scored Detection (`⚽ GOAL!`):** Dragging the match ball inside the left or right protruding woven goal net highlights the net in gold and renders a **`⚽ GOAL!`** celebration badge during editing, playback, and MP4/GIF export.
-- **Selected Token Inspector Bar:** Click any player or equipment token in Move mode to customize:
+- **Selected Token Inspector Bar:** Click any player, referee, or equipment token in Move mode to customize:
+  - **Live FIFA `105m × 68m` Location Badge:** Displays exact metric coordinates (`e.g. 78.0m × 34.0m`), 18-Zone identifier (`Zone 14`), 20-Zone *Juego de Posición* code (`C-C`), pitch phase (`Final Third / Central Corridor`), and active specialized sub-zone badges (`Zone 14 (Assist)`, `Golden Zone`, `Half-Space Pocket`, `Byline Cutback`) in real-time as tokens are dragged.
   - **Jersey Number** (`1–99`)
-  - **Player Name / Role Tag** (rendered in a pill badge beneath the player token)
+  - **Player Name / Role Tag** (rendered in an upright pill badge beneath the player token)
   - **Directional Vision Cone (`65°` FOV)** + **Facing Angle Slider (`0°–360°`)** to visualize body orientation and scanning angles
   - **Equipment Rotation (`+45°`)** and **Remove from Pitch**
 
@@ -77,25 +78,37 @@ Expand **`+ Equipment & Bench`** (or switch `Mode:` to **`Empty Pitch (Free Buil
 
 ### 4. Full Vertical View & Multi-System Pitch Tactical Divisions
 - **Full Vertical View (`Pitch: Full Vertical`):** Rotates the stage to a coach's behind-the-goal / touchline perspective while automatically counter-rotating player jersey numbers (`1–11`), Referee `R`, player nameplates, on-pitch text labels, and upright equipment (`Cone`, `Mannequin Wall`, `Hurdle`, `Slalom Pole`, `Goal Net`) so nothing appears sideways.
-- **Pitch Tactical Divisions & Coordinate Systems (`Pitch Divisions` / `Grid:`):** Normalized to a FIFA `105m × 68m` pitch (`1m = 10px`) with smart show/hide layering:
-  - **Mutually Exclusive Primary Grids (Pick 1):**
-    1. **`3 Thirds Only`:** Horizontal *Defensive (`0–35m`)*, *Middle (`35–70m`)*, and *Final (`70–105m`)* thirds plus subtle 18-yard box tint.
-    2. **`5 Channels Only`:** The 5 FIFA marking-anchored lanes (*Left Flank*, *Left Half-Space*, *Central Corridor*, *Right Half-Space*, *Right Flank*).
-    3. **`Thirds + 5 Channels`:** Combined horizontal thirds + 5 vertical lanes + 18-yard box tint.
-    4. **`18-Zone Grid (1–18)`:** 3 equal lanes (`22.67m`) × 6 horizontal strips (`17.5m`), sequentially numbered `Zone 1` to `Zone 18` (`Zone 14` highlighted as the Assist Zone, `Zone 17` as the Penalty Box).
-    5. **`20-Zone Juego de Posición (`B-LF` .. `F-RF`)`:** 5 marking-anchored channels × 4 functional tiers (*Build-Up*, *Progression*, *Creation* with `C-LHS`/`C-RHS` Prime Pockets, and *Finishing*).
-  - **Independent Tactical Sub-Zone Toggles & Spacing Rules (Layer on Any Grid or Clean Pitch):**
-    - **`Zone 14 (Assist Zone)`** (`X: 70–88.5m, Y: 22.67–45.33m`)
-    - **`Golden Zone`** (`X: 94–105m, Y: 24.84–43.16m` — 6-yard width out to the penalty spot)
-    - **`Half-Space Pockets`** (`X: 52.5–88.5m` inside Left & Right Half-Spaces)
-    - **`Byline Cutback Zones`** (`X: 88.5–105m` wide penalty-box channels)
-    - **`⇄ Both Halves`:** Mirrors active sub-zones onto both defensive and attacking halves.
-    - **`⚡ Spacing Rules`:** Live *Juego de Posición* spacing rule checker that highlights any vertical channel with `>2` outfield players or horizontal tier with `>3` outfield players.
-  - **Live Token Coordinate Badge:** Clicking any player or ball displays its real-time FIFA meter coordinates (`e.g. 78.0m × 34.0m`), `Zone 1..18`, `20-Zone` code (`C-C`), and active specialized sub-zone inside the Token Inspector.
+- **Pitch Tactical Divisions & Coordinate Systems (`Pitch Divisions` / `Grid:`):** Built on the normalized FIFA standard pitch (`105m` length × `68m` width, mapped at `1m = 10px`), providing professional analytics grids with a smart two-tier show/hide interface to prevent visual clutter:
+
+![Pitch tactical divisions animation cycling through Thirds, Channels, 18-Zone, and 20-Zone grids](docs/divisions-animation.gif)
+
+#### A. Mutually Exclusive Primary Grids (`Pick 1`)
+Only one full-pitch coordinate grid is active at a time so boundary lines never collide:
+1. **`3 Thirds Only`:** Splits the pitch lengthwise into *Defensive Third (`0–35m`)*, *Middle Third (`35–70m`)*, and *Final / Attacking Third (`70–105m`)*, plus analytical tinting over both 18-yard penalty areas.
+2. **`5 Channels Only`:** Splits the pitch widthwise into 5 lanes anchored to FIFA penalty/goal box markings: *Left Flank (`0–13.84m`)*, *Left Half-Space (`13.84–24.84m`)*, *Central Corridor (`24.84–43.16m`)*, *Right Half-Space (`43.16–54.16m`)*, and *Right Flank (`54.16–68m`)*.
+3. **`Thirds + 5 Channels`:** Combines horizontal thirds and vertical lanes into the classic 15-zone coaching matrix.
+4. **`18-Zone Grid (1–18)`:** 3 equal lanes (`22.67m`) × 6 horizontal depth strips (`17.5m`), sequentially numbered `Zone 1` to `Zone 18` from own goal line to opponent goal line (`Zone 14` highlighted as the *Assist Zone*, `Zone 17` as the *Penalty Box*).
+5. **`20-Zone Juego de Posición (`B-LF` .. `F-RF`)`:** 5 marking-anchored channels × 4 functional tiers (*Tier 1: Build-Up `0–26.25m`*, *Tier 2: Progression `26.25–52.5m`*, *Tier 3: Creation `52.5–78.75m`*, *Tier 4: Finishing `78.75–105m`*), with `C-LHS` and `C-RHS` highlighted as *Prime Pockets*.
+
+![18-Zone grid with Zone 14 Assist and Golden Zone highlights](docs/board-divisions.png)
+
+#### B. Independent Specialized Tactical Sub-Zones (`Layer Any`)
+Can be toggled in any combination on top of any primary grid—or on a clean pitch:
+- **`Zone 14 (Assist Zone)` (`X: 70–88.5m, Y: 22.67–45.33m`):** Amber highlighted rectangle in front of the opponent's penalty area yielding the highest shot conversion from passes.
+- **`Golden Zone` (`X: 94–105m, Y: 24.84–43.16m`):** Emerald high-xG finishing target spanning the width of the 6-yard box out to the penalty spot (`94m`).
+- **`Half-Space Pockets` (`X: 52.5–88.5m`):** Cyan shaded corridors between opposition midfield and defensive lines inside Left and Right Half-Spaces.
+- **`Byline Cutback Zones` (`X: 88.5–105m`):** Purple shaded cutback boxes inside the penalty area between the 6-yard box and 18-yard side lines for low pulled-back crosses.
+- **`⇄ Both Halves`:** Symmetry toggle that mirrors active sub-zones onto both defensive and attacking halves (or automatically targets the visible half in Half Pitch views).
+
+#### C. Live *Juego de Posición* Spacing Rule Checker (`⚡ Spacing Rules`)
+Activating `⚡ Spacing Rules` monitors Home outfield player distribution in real-time as you drag tokens:
+- **Max 2 Players per Channel:** Flashes a red warning badge (`⚠ LHS CROWDED (3/2)`) if more than 2 outfield players occupy the same vertical lane.
+- **Max 3 Players per Tier:** Flashes a red warning badge (`⚠ P CROWDED (4/3)`) if more than 3 outfield players occupy the same horizontal tier.
+- Displays a green **`✓ POSITIONAL SPACING OK`** banner when all positional play rules are satisfied.
+
+![20-Zone Juego de Posicion grid with Half-Space Pockets, Byline Cutback, and live Spacing Rule warnings](docs/board-divisions-positional.png)
 
 ![Full Vertical View with upright player numbers, Referee R, cone, and tactical arrows](docs/board-vertical-view.png)
-
-![Pitch divisions overlay](docs/board-divisions.png)
 
 ---
 
@@ -192,12 +205,13 @@ npm test
 ## Roadmap
 
 - [x] Proportional 11v11 pitch, outer stadium apron, protruding woven goal nets, classic football, and boundary-clamped 60fps drag & drop
-- [x] 5 squad & drill modes (`11v11`, `9v9`, `7v7`, `5v5`, `Empty Pitch`), 7 instant 11v11 formations (`4-3-3`, `4-2-3-1`, `4-4-2`, `3-5-2`, `3-4-3`, `5-3-2`, `4-1-4-1`), custom team colors, 4 pitch views (`Full`, `Half Left`, `Half Right`, `Vertical` with upright numbers/cones), and board zoom from `70%` to `200%`
-- [x] Mowed grass stripes, protruding woven goal nets with live `⚽ GOAL!` detection, and 18-zone analytical pitch divisions overlay
+- [x] 5 squad & drill modes (`11v11`, `9v9`, `7v7`, `5v5`, `Empty Pitch`), 7 instant 11v11 formations (`4-3-3`, `4-2-3-1`, `4-4-2`, `3-5-2`, `3-4-3`, `5-3-2`, `4-1-4-1`), custom team colors, 4 pitch views (`Full`, `Half Left`, `Half Right`, `Vertical` with upright numbers/cones), and smooth linear zoom from `70%` to `200%` across 14 calibrated levels
+- [x] Mowed grass stripes, protruding woven goal nets with live `⚽ GOAL!` detection, and multi-system FIFA `105m × 68m` tactical pitch divisions (`3 Thirds`, `5 Channels`, `Thirds + 5 Channels`, `18-Zone Grid`, and `20-Zone Juego de Posición`)
+- [x] Independent tactical sub-zone overlays (`Zone 14 Assist`, `Golden Zone`, `Half-Space Pockets`, `Byline Cutbacks`, `⇄ Both Halves` mirror) and live *Juego de Posición* spacing rule checker (`⚡ Spacing Rules`)
 - [x] 6 tactical arrow styles (`Pass`, `Run`, `Dribble`, `Target Zone`, `Block ┬`, `Freehand`), curved Bézier handles, 7 ink colors, 3 stroke weights, and contextual SVG mouse cursors (`Eraser`, `Pencil`, `Crosshair`, `Grab`)
 - [x] Tactical zone shapes (`Rect`, `Circle`, `Triangle`), draggable on-pitch text labels, per-frame coaching notes, and single-click item eraser
 - [x] Drag-and-drop bench & training equipment palette (`Cone`, `Marker Disc`, `Hurdle`, `Agility Ladder`, `Slalom Pole`, `Mannequin Wall`, `Training Ring`, `Mini-Goal`, `Goal Net (Scored!)`, `Referee`, Goalkeepers, extra players & balls)
-- [x] Player token inspector: custom jersey numbers, name/role badges, and directional `65°` vision cones
+- [x] Player token inspector: custom jersey numbers, name/role badges, directional `65°` vision cones with `360°` facing slider, and real-time FIFA metric coordinate readout with zone identifiers
 - [x] Interactive 6-step onboarding feature tour (`? Tour`) and 3 built-in multi-frame animated demo tactics (`Demos (3)`)
 - [x] Keyframe timeline engine: `Play`, `Play Step`, `Loop`, scrub slider, step duration control, and ghost trails
 - [x] Client-side `2x` PNG, animated GIF, and 720p H.264 MP4 video export with FFmpeg.wasm

@@ -14,7 +14,9 @@ All media lives in `docs/` and is referenced from `README.md`. Current assets:
 | `board-arrows.png` | Pass / Run / Dribble / Target Zone / Block `┬` arrows, zone shapes, and text annotations |
 | `board-empty-pitch-drill.png` | Empty Pitch (Free Build) mode, Drag-to-Pitch palette, cones/mannequins, and `⚽ GOAL!` celebration in the net |
 | `board-vertical-view.png` | Full Vertical view with upright player numbers (`1–11`), Referee `R`, cone, and tactical arrows |
-| `board-divisions.png` | 18-zone pitch divisions overlay (thirds, half-spaces, channels) |
+| `board-divisions.png` | Standard 18-Zone grid overlay with Zone 14 Assist and Golden Zone highlights |
+| `board-divisions-positional.png` | 20-Zone Juego de Posición grid, Half-Space Pockets, Byline Cutbacks, and live Spacing Rule warnings |
+| `divisions-animation.gif` | Looping animated GIF cycling through 3 Thirds, 5 Channels, 18-Zone, 20-Zone, and Spacing Rules |
 | `board-timeline.png` | Timeline bar, ghost trails, scrub + step sliders, `Play Step`, `Loop`, and export buttons |
 | `board-export-mp4.png` | Half-Pitch view with protruding goal net and Export PNG / GIF / MP4 controls |
 | `board-animation.gif` | Looping GIF of the 11v11 High Press & Midfield Trap animation (top of README) |
