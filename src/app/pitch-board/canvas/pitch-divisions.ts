@@ -4,6 +4,7 @@ import {
   BASE_WIDTH,
   PitchDivisionsConfig,
   PitchViewMode,
+  TacticalEntity,
   TacticalLocationSummary,
 } from '../models/tactical-board.models';
 
@@ -27,6 +28,7 @@ export const DEFAULT_DIVISIONS_CONFIG: PitchDivisionsConfig = {
     cutback: false,
   },
   mirrorSubZones: false,
+  checkPositionalSpacing: false,
 };
 
 /**
@@ -124,25 +126,111 @@ export function getTacticalLocationSummary(xPx: number, yPx: number): TacticalLo
   };
 }
 
+export interface PositionalSpacingViolation {
+  kind: 'channel' | 'tier';
+  code: string;
+  label: string;
+  count: number;
+  maxAllowed: number;
+  boundsPx: { x: number; y: number; width: number; height: number };
+}
+
+/**
+ * Evaluates Juego de Posición spacing rules for outfield players of `team`:
+ * - Max 2 outfield players in the same Vertical Channel (LF, LHS, C, RHS, RF)
+ * - Max 3 outfield players in the same Horizontal Tier (B, P, C, F)
+ */
+export function evaluatePositionalSpacing(
+  entities: TacticalEntity[],
+  team: 'home' | 'away' = 'home'
+): PositionalSpacingViolation[] {
+  const players = entities.filter(
+    (e) => e.type === team && e.label !== '1' && e.label !== 'GK'
+  );
+  const channelCodes = ['LF', 'LHS', 'C', 'RHS', 'RF'] as const;
+  const channelLabels: Record<string, string> = {
+    LF: 'Left Flank',
+    LHS: 'Left Half-Space',
+    C: 'Central Corridor',
+    RHS: 'Right Half-Space',
+    RF: 'Right Flank',
+  };
+  const tierCodes = ['B', 'P', 'C', 'F'] as const;
+  const tierLabels: Record<string, string> = {
+    B: 'Build-Up Tier',
+    P: 'Progression Tier',
+    C: 'Creation Tier',
+    F: 'Finishing Tier',
+  };
+
+  const channelCounts = [0, 0, 0, 0, 0];
+  const tierCounts = [0, 0, 0, 0];
+
+  players.forEach((p) => {
+    const xm = Math.max(0, Math.min(105, p.x / 10));
+    const ym = Math.max(0, Math.min(68, p.y / 10));
+    const cIdx =
+      ym < 13.84 ? 0 : ym < 24.84 ? 1 : ym < 43.16 ? 2 : ym < 54.16 ? 3 : 4;
+    const tIdx = Math.min(3, Math.max(0, Math.floor(xm / 26.25)));
+    channelCounts[cIdx]++;
+    tierCounts[tIdx]++;
+  });
+
+  const violations: PositionalSpacingViolation[] = [];
+
+  channelCounts.forEach((count, i) => {
+    if (count > 2) {
+      const y1 = CHANNEL_BOUNDS_PX[i];
+      const y2 = CHANNEL_BOUNDS_PX[i + 1];
+      violations.push({
+        kind: 'channel',
+        code: channelCodes[i],
+        label: channelLabels[channelCodes[i]],
+        count,
+        maxAllowed: 2,
+        boundsPx: { x: 0, y: y1, width: BASE_WIDTH, height: y2 - y1 },
+      });
+    }
+  });
+
+  const tierW = BASE_WIDTH / 4;
+  tierCounts.forEach((count, i) => {
+    if (count > 3) {
+      violations.push({
+        kind: 'tier',
+        code: tierCodes[i],
+        label: tierLabels[tierCodes[i]],
+        count,
+        maxAllowed: 3,
+        boundsPx: { x: i * tierW, y: 0, width: tierW, height: BASE_HEIGHT },
+      });
+    }
+  });
+
+  return violations;
+}
+
 export function isAnyDivisionActive(config: PitchDivisionsConfig): boolean {
   return (
     config.grid !== 'none' ||
     config.subZones.zone14 ||
     config.subZones.goldenZone ||
     config.subZones.pockets ||
-    config.subZones.cutback
+    config.subZones.cutback ||
+    config.checkPositionalSpacing
   );
 }
 
 /**
- * Draws the selected Primary Grid ('thirds-channels' | 'zones-18' | 'zones-20' | 'none')
- * and any enabled Specialized Tactical Sub-Zones onto `divisionsLayer`.
+ * Draws the selected Primary Grid ('thirds' | 'channels' | 'thirds-channels' | 'zones-18' | 'zones-20' | 'none'),
+ * any enabled Specialized Tactical Sub-Zones, and optional Juego de Posición spacing rule highlights onto `divisionsLayer`.
  */
 export function drawPitchDivisions(
   divisionsLayer: Konva.Layer,
-   uprightRot: number,
+  uprightRot: number,
   config: PitchDivisionsConfig = DEFAULT_DIVISIONS_CONFIG,
-  pitchView: PitchViewMode = 'full'
+  pitchView: PitchViewMode = 'full',
+  entities: TacticalEntity[] = []
 ): void {
   divisionsLayer.destroyChildren();
 
@@ -154,8 +242,17 @@ export function drawPitchDivisions(
 
   divisionsLayer.visible(true);
 
-  if (config.grid === 'thirds-channels') {
-    renderThirdsAndChannelsGrid(divisionsLayer, uprightRot);
+  if (
+    config.grid === 'thirds' ||
+    config.grid === 'channels' ||
+    config.grid === 'thirds-channels'
+  ) {
+    renderThirdsAndChannelsGrid(
+      divisionsLayer,
+      uprightRot,
+      config.grid !== 'channels',
+      config.grid !== 'thirds'
+    );
   } else if (config.grid === 'zones-18') {
     render18ZoneGrid(divisionsLayer, uprightRot, config);
   } else if (config.grid === 'zones-20') {
@@ -163,6 +260,11 @@ export function drawPitchDivisions(
   }
 
   renderSpecializedSubZones(divisionsLayer, config, uprightRot, pitchView);
+
+  if (config.checkPositionalSpacing) {
+    renderPositionalSpacingOverlay(divisionsLayer, entities, uprightRot);
+  }
+
   divisionsLayer.batchDraw();
 }
 
@@ -238,7 +340,12 @@ function addCenteredBadge(
  * 1. Fundamental Pitch Divisions: Horizontal Thirds (35m, 70m + 52.5m Midfield split)
  *    & 5 Vertical Channels anchored to penalty/goal area markings.
  */
-function renderThirdsAndChannelsGrid(layer: Konva.Layer, uprightRot: number) {
+function renderThirdsAndChannelsGrid(
+  layer: Konva.Layer,
+  uprightRot: number,
+  showThirds = true,
+  showChannels = true
+) {
   const W = BASE_WIDTH;
   const H = BASE_HEIGHT;
   const lanes = CHANNEL_BOUNDS_PX; // [0, 138.4, 248.4, 431.6, 541.6, 680]
@@ -250,22 +357,48 @@ function renderThirdsAndChannelsGrid(layer: Konva.Layer, uprightRot: number) {
     'Right Flank (54.2–68m)',
   ];
 
-  // Subtle gold tint along Left & Right Half-Spaces
-  [
-    [lanes[1], lanes[2]],
-    [lanes[3], lanes[4]],
-  ].forEach(([from, to]) => {
+  // Subtle analytical highlight on both 18-yard penalty boxes (preserved from original divisions view)
+  if (showThirds) {
+    const cy = H / 2;
+    const boxHalf = 403.2 / 2;
     layer.add(
       new Konva.Rect({
         x: 0,
-        y: from,
-        width: W,
-        height: to - from,
-        fill: 'rgba(250, 204, 21, 0.11)',
+        y: cy - boxHalf,
+        width: 165,
+        height: 403.2,
+        fill: 'rgba(255, 255, 255, 0.08)',
+        listening: false,
+      }),
+      new Konva.Rect({
+        x: W - 165,
+        y: cy - boxHalf,
+        width: 165,
+        height: 403.2,
+        fill: 'rgba(255, 255, 255, 0.08)',
         listening: false,
       })
     );
-  });
+  }
+
+  // Subtle gold tint along Left & Right Half-Spaces
+  if (showChannels) {
+    [
+      [lanes[1], lanes[2]],
+      [lanes[3], lanes[4]],
+    ].forEach(([from, to]) => {
+      layer.add(
+        new Konva.Rect({
+          x: 0,
+          y: from,
+          width: W,
+          height: to - from,
+          fill: 'rgba(250, 204, 21, 0.12)',
+          listening: false,
+        })
+      );
+    });
+  }
 
   const dashed = {
     stroke: 'rgba(255, 255, 255, 0.58)',
@@ -275,55 +408,61 @@ function renderThirdsAndChannelsGrid(layer: Konva.Layer, uprightRot: number) {
   };
 
   // 4 internal channel lines
-  lanes.slice(1, -1).forEach((y) => {
-    layer.add(new Konva.Line({ points: [0, y, W, y], ...dashed }));
-  });
+  if (showChannels) {
+    lanes.slice(1, -1).forEach((y) => {
+      layer.add(new Konva.Line({ points: [0, y, W, y], ...dashed }));
+    });
+  }
 
   // 2 main Third boundary lines (35m = 350px, 70m = 700px)
-  [350, 700].forEach((x) => {
-    layer.add(
-      new Konva.Line({
-        points: [x, 0, x, H],
-        stroke: 'rgba(250, 204, 21, 0.78)',
-        strokeWidth: 2.2,
-        dash: [12, 7],
-        listening: false,
-      })
-    );
-  });
-
-  // Third headers
-  const thirds: Array<{ title: string; sub: string; cx: number }> = [
-    { title: 'DEFENSIVE THIRD', sub: '0m – 35m (Build-Up)', cx: 175 },
-    { title: 'MIDDLE THIRD', sub: '35m – 70m (Low / High Mid)', cx: 525 },
-    { title: 'FINAL THIRD', sub: '70m – 105m (Attacking)', cx: 875 },
-  ];
-  thirds.forEach((t) => {
-    addCenteredBadge(layer, t.cx, 22, t.title, t.sub, uprightRot, {
-      width: 148,
-      fill: 'rgba(15, 23, 42, 0.80)',
-      stroke: 'rgba(250, 204, 21, 0.55)',
+  if (showThirds) {
+    [350, 700].forEach((x) => {
+      layer.add(
+        new Konva.Line({
+          points: [x, 0, x, H],
+          stroke: 'rgba(250, 204, 21, 0.78)',
+          strokeWidth: 2.2,
+          dash: [12, 7],
+          listening: false,
+        })
+      );
     });
-  });
 
-  // 5 Channel labels in the middle third
-  laneNames.forEach((name, i) => {
-    const midY = (lanes[i] + lanes[i + 1]) / 2;
-    const isHS = i === 1 || i === 3;
-    addCenteredBadge(
-      layer,
-      260,
-      midY,
-      name,
-      isHS ? 'Diagonal Passing / Pockets' : undefined,
-      uprightRot,
-      {
-        width: 168,
-        fill: isHS ? 'rgba(113, 63, 18, 0.76)' : 'rgba(15, 23, 42, 0.68)',
-        stroke: isHS ? 'rgba(250, 204, 21, 0.65)' : 'rgba(255, 255, 255, 0.28)',
-      }
-    );
-  });
+    // Third headers
+    const thirds: Array<{ title: string; sub: string; cx: number }> = [
+      { title: 'DEFENSIVE THIRD', sub: '0m – 35m (Build-Up)', cx: 175 },
+      { title: 'MIDDLE THIRD', sub: '35m – 70m (Low / High Mid)', cx: 525 },
+      { title: 'FINAL THIRD', sub: '70m – 105m (Attacking)', cx: 875 },
+    ];
+    thirds.forEach((t) => {
+      addCenteredBadge(layer, t.cx, 22, t.title, t.sub, uprightRot, {
+        width: 148,
+        fill: 'rgba(15, 23, 42, 0.80)',
+        stroke: 'rgba(250, 204, 21, 0.55)',
+      });
+    });
+  }
+
+  // 5 Channel labels
+  if (showChannels) {
+    laneNames.forEach((name, i) => {
+      const midY = (lanes[i] + lanes[i + 1]) / 2;
+      const isHS = i === 1 || i === 3;
+      addCenteredBadge(
+        layer,
+        showThirds ? 260 : 525,
+        midY,
+        name,
+        isHS ? 'Diagonal Passing / Pockets' : undefined,
+        uprightRot,
+        {
+          width: 168,
+          fill: isHS ? 'rgba(113, 63, 18, 0.76)' : 'rgba(15, 23, 42, 0.68)',
+          stroke: isHS ? 'rgba(250, 204, 21, 0.65)' : 'rgba(255, 255, 255, 0.28)',
+        }
+      );
+    });
+  }
 }
 
 /**
@@ -726,4 +865,70 @@ function renderSpecializedSubZones(
     if (showRight) drawCutbacks(885, 1050);
     if (showLeft) drawCutbacks(0, 165);
   }
+}
+
+/**
+ * 5. Juego de Posición Spacing Rule Checker:
+ *    Highlights any Vertical Channel with >2 Home outfield players or Horizontal Tier with >3 Home outfield players.
+ */
+function renderPositionalSpacingOverlay(
+  layer: Konva.Layer,
+  entities: TacticalEntity[],
+  uprightRot: number
+) {
+  const violations = evaluatePositionalSpacing(entities, 'home');
+
+  if (violations.length === 0) {
+    addCenteredBadge(
+      layer,
+      BASE_WIDTH / 2,
+      BASE_HEIGHT - 22,
+      '✓ POSITIONAL SPACING OK',
+      'Juego de Posición: ≤3 per Tier & ≤2 per Channel',
+      uprightRot,
+      {
+        fill: 'rgba(6, 78, 59, 0.92)',
+        stroke: '#10b981',
+        textColor: '#ecfdf5',
+        subColor: '#6ee7b7',
+        width: 248,
+      }
+    );
+    return;
+  }
+
+  violations.forEach((v) => {
+    const { x, y, width, height } = v.boundsPx;
+    layer.add(
+      new Konva.Rect({
+        x,
+        y,
+        width,
+        height,
+        fill: 'rgba(244, 63, 94, 0.22)',
+        stroke: '#f43f5e',
+        strokeWidth: 2.5,
+        dash: [8, 5],
+        listening: false,
+      })
+    );
+
+    const badgeX = v.kind === 'channel' ? 895 : x + width / 2;
+    const badgeY = v.kind === 'channel' ? y + height / 2 : BASE_HEIGHT - 26;
+    addCenteredBadge(
+      layer,
+      badgeX,
+      badgeY,
+      `⚠ ${v.code} CROWDED (${v.count}/${v.maxAllowed})`,
+      `Max ${v.maxAllowed} in ${v.label}`,
+      uprightRot,
+      {
+        fill: 'rgba(136, 19, 55, 0.92)',
+        stroke: '#fb7185',
+        textColor: '#ffe4e6',
+        subColor: '#fda4af',
+        width: 146,
+      }
+    );
+  });
 }

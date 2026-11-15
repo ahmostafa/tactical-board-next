@@ -79,15 +79,18 @@ Expand **`+ Equipment & Bench`** (or switch `Mode:` to **`Empty Pitch (Free Buil
 - **Full Vertical View (`Pitch: Full Vertical`):** Rotates the stage to a coach's behind-the-goal / touchline perspective while automatically counter-rotating player jersey numbers (`1–11`), Referee `R`, player nameplates, on-pitch text labels, and upright equipment (`Cone`, `Mannequin Wall`, `Hurdle`, `Slalom Pole`, `Goal Net`) so nothing appears sideways.
 - **Pitch Tactical Divisions & Coordinate Systems (`Pitch Divisions` / `Grid:`):** Normalized to a FIFA `105m × 68m` pitch (`1m = 10px`) with smart show/hide layering:
   - **Mutually Exclusive Primary Grids (Pick 1):**
-    1. **`Thirds & 5 Channels`:** Horizontal *Defensive (`0–35m`)*, *Middle (`35–70m`)*, and *Final (`70–105m`)* thirds crossed with the 5 FIFA marking-anchored lanes (*Left Flank*, *Left Half-Space*, *Central Corridor*, *Right Half-Space*, *Right Flank*).
-    2. **`18-Zone Grid (1–18)`:** 3 equal lanes (`22.67m`) × 6 horizontal strips (`17.5m`), sequentially numbered `Zone 1` to `Zone 18` (`Zone 14` highlighted as the Assist Zone, `Zone 17` as the Penalty Box).
-    3. **`20-Zone Juego de Posición (`B-LF` .. `F-RF`)`:** 5 marking-anchored channels × 4 functional tiers (*Build-Up*, *Progression*, *Creation* with `C-LHS`/`C-RHS` Prime Pockets, and *Finishing*).
-  - **Independent Tactical Sub-Zone Toggles (Layer on Any Grid or Clean Pitch):**
+    1. **`3 Thirds Only`:** Horizontal *Defensive (`0–35m`)*, *Middle (`35–70m`)*, and *Final (`70–105m`)* thirds plus subtle 18-yard box tint.
+    2. **`5 Channels Only`:** The 5 FIFA marking-anchored lanes (*Left Flank*, *Left Half-Space*, *Central Corridor*, *Right Half-Space*, *Right Flank*).
+    3. **`Thirds + 5 Channels`:** Combined horizontal thirds + 5 vertical lanes + 18-yard box tint.
+    4. **`18-Zone Grid (1–18)`:** 3 equal lanes (`22.67m`) × 6 horizontal strips (`17.5m`), sequentially numbered `Zone 1` to `Zone 18` (`Zone 14` highlighted as the Assist Zone, `Zone 17` as the Penalty Box).
+    5. **`20-Zone Juego de Posición (`B-LF` .. `F-RF`)`:** 5 marking-anchored channels × 4 functional tiers (*Build-Up*, *Progression*, *Creation* with `C-LHS`/`C-RHS` Prime Pockets, and *Finishing*).
+  - **Independent Tactical Sub-Zone Toggles & Spacing Rules (Layer on Any Grid or Clean Pitch):**
     - **`Zone 14 (Assist Zone)`** (`X: 70–88.5m, Y: 22.67–45.33m`)
     - **`Golden Zone`** (`X: 94–105m, Y: 24.84–43.16m` — 6-yard width out to the penalty spot)
     - **`Half-Space Pockets`** (`X: 52.5–88.5m` inside Left & Right Half-Spaces)
     - **`Byline Cutback Zones`** (`X: 88.5–105m` wide penalty-box channels)
     - **`⇄ Both Halves`:** Mirrors active sub-zones onto both defensive and attacking halves.
+    - **`⚡ Spacing Rules`:** Live *Juego de Posición* spacing rule checker that highlights any vertical channel with `>2` outfield players or horizontal tier with `>3` outfield players.
   - **Live Token Coordinate Badge:** Clicking any player or ball displays its real-time FIFA meter coordinates (`e.g. 78.0m × 34.0m`), `Zone 1..18`, `20-Zone` code (`C-C`), and active specialized sub-zone inside the Token Inspector.
 
 ![Full Vertical View with upright player numbers, Referee R, cone, and tactical arrows](docs/board-vertical-view.png)

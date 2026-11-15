@@ -4,7 +4,12 @@ import { getFormationEntities } from './formations.data';
 import { encodeSchemeHash, decodeSchemeHash } from './board-storage';
 import { DEMO_TACTICS, TOUR_STEPS } from './demo-tactics.data';
 import { computeArrowPath, computeTBarPoints } from './canvas/arrow-renderer';
-import { getTacticalLocationSummary, getZone18, getZone20 } from './canvas/pitch-divisions';
+import {
+  evaluatePositionalSpacing,
+  getTacticalLocationSummary,
+  getZone18,
+  getZone20,
+} from './canvas/pitch-divisions';
 
 describe('BoardStore & Tactical Features', () => {
   let store: InstanceType<typeof BoardStore>;
@@ -172,5 +177,12 @@ describe('BoardStore & Tactical Features', () => {
     const goldenSummary = getTacticalLocationSummary(980, 340);
     expect(goldenSummary.zone18).toBe(17);
     expect(goldenSummary.subZones).toContain('Golden Zone');
+
+    const crowdedChannel = evaluatePositionalSpacing([
+      { id: 'h2', type: 'home', x: 200, y: 180, label: '2' },
+      { id: 'h8', type: 'home', x: 500, y: 190, label: '8' },
+      { id: 'h10', type: 'home', x: 700, y: 200, label: '10' },
+    ]);
+    expect(crowdedChannel.some((v) => v.kind === 'channel' && v.code === 'LHS')).toBe(true);
   });
 });

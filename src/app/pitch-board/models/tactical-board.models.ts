@@ -34,7 +34,13 @@ export type ActiveToolMode = 'move' | 'arrow' | 'shape' | 'text' | 'eraser';
  * Mutually exclusive primary coordinate grid modes for the pitch divisions overlay.
  * Only one full-pitch grid is displayed at a time so grid lines and labels never clash.
  */
-export type PitchDivisionGridMode = 'none' | 'thirds-channels' | 'zones-18' | 'zones-20';
+export type PitchDivisionGridMode =
+  | 'none'
+  | 'thirds'
+  | 'channels'
+  | 'thirds-channels'
+  | 'zones-18'
+  | 'zones-20';
 
 /**
  * Independent specialized tactical sub-zones that can be toggled on/off in any combination.
@@ -46,6 +52,8 @@ export interface PitchDivisionsConfig {
   subZones: Record<PitchSubZoneId, boolean>;
   /** When true, specialized sub-zones are rendered on both attacking (right) and defensive (left) halves. */
   mirrorSubZones: boolean;
+  /** When true, evaluates Juego de Posición spacing rules (max 3 players per horizontal tier, max 2 per vertical channel). */
+  checkPositionalSpacing: boolean;
 }
 
 export interface TacticalLocationSummary {

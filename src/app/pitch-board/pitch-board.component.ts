@@ -129,11 +129,14 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     grid: 'none',
     subZones: { ...DEFAULT_DIVISIONS_CONFIG.subZones },
     mirrorSubZones: false,
+    checkPositionalSpacing: false,
   });
   showDivisionsPanel = signal(false);
   showDivisions = computed(() => isAnyDivisionActive(this.divisionsConfig()));
   activeSubZoneCount = computed(
-    () => Object.values(this.divisionsConfig().subZones).filter(Boolean).length
+    () =>
+      Object.values(this.divisionsConfig().subZones).filter(Boolean).length +
+      (this.divisionsConfig().checkPositionalSpacing ? 1 : 0)
   );
   showGhost = signal(true);
   loopPlayback = signal(false);
@@ -263,6 +266,9 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     this.renderTexts(texts, note);
     renderGoalScoredOverlay(this.drawingLayer, entities, this.uprightRotation());
     this.drawingLayer.opacity(1);
+    if (this.divisionsConfig().checkPositionalSpacing) {
+      this.refreshDivisionsLayer();
+    }
     renderGhostLayer(
       this.ghostLayer,
       ghost && current > 0 ? frames[current - 1].entities : null,
@@ -475,7 +481,8 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
       this.divisionsLayer,
       this.uprightRotation(),
       this.divisionsConfig(),
-      this.pitchView()
+      this.pitchView(),
+      this.store.entities()
     );
   }
 
@@ -497,6 +504,8 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     this.refreshDivisionsLayer();
     const names: Record<PitchDivisionGridMode, string> = {
       none: 'Primary Grid hidden',
+      thirds: 'Grid: 3 Horizontal Thirds Only (0–35–70–105m)',
+      channels: 'Grid: 5 Vertical Channels Only (Flanks, Half-Spaces, Centre)',
       'thirds-channels': 'Grid: Thirds & 5 Vertical Channels',
       'zones-18': 'Grid: Standard 18-Zone Grid (3×6)',
       'zones-20': 'Grid: 20-Zone Juego de Posición (5×4)',
@@ -520,6 +529,19 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     this.refreshDivisionsLayer();
   }
 
+  togglePositionalSpacing() {
+    this.divisionsConfig.update((c) => ({
+      ...c,
+      checkPositionalSpacing: !c.checkPositionalSpacing,
+    }));
+    this.refreshDivisionsLayer();
+    this.showStatus(
+      this.divisionsConfig().checkPositionalSpacing
+        ? 'Juego de Posición Spacing Rule Checker enabled (Max 3/Tier, Max 2/Channel)'
+        : 'Juego de Posición Spacing Rule Checker hidden'
+    );
+  }
+
   enableAllSubZones() {
     this.divisionsConfig.update((c) => ({
       ...c,
@@ -534,6 +556,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
       grid: 'none',
       subZones: { zone14: false, goldenZone: false, pockets: false, cutback: false },
       mirrorSubZones: false,
+      checkPositionalSpacing: false,
     });
     this.refreshDivisionsLayer();
     this.showStatus('Cleared all pitch divisions and sub-zones');
