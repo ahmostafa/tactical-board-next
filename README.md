@@ -241,7 +241,7 @@ Tactical Board Next is deployed as a high-performance, globally distributed Sing
   - Powered by open-source [GoatCounter](https://www.goatcounter.com).
   - Tracks total visits, daily unique users, and **geographic distribution (country & region breakdown)**.
   - Dashboard: [https://tactical-board-next.goatcounter.com](https://tactical-board-next.goatcounter.com)
-- **CI/CD Pipeline:** Automated GitHub Actions workflow (`.github/workflows/deploy.yml`) enforces `npx tsc --noEmit` and `npm test` unit test gates before building and deploying on every push to `main` and on version tags (`v*`).
+- **CI/CD Pipeline:** Automated GitHub Actions workflow (`.github/workflows/deploy.yml`) enforces `npx tsc --noEmit` and `npm test` unit test gates before building and deploying on every push to `main` (and manual `workflow_dispatch`).
 - **In-App About, Version Display & 404/500 Resilience:** Includes an interactive `ℹ About (v1.0.1)` modal, a `404 — Out of Bounds` recovery route backed by `404.html`, and a global runtime error boundary with clean-state recovery.
 - **Detailed Guides:**
   - [Production Deployment Skill](.agents/skills/deployment/SKILL.md)

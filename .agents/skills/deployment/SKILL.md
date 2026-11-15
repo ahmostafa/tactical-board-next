@@ -12,7 +12,7 @@ This guide outlines the production deployment architecture for Tactical Board Ne
 ## 1. Architecture Overview
 
 - **Hosting Platform:** GitHub Pages (served via Fastly global edge CDN with automated Let's Encrypt SSL/TLS certificates).
-- **CI/CD Automation:** GitHub Actions (`.github/workflows/deploy.yml`) running on push to `main` or release tag (`v*`).
+- **CI/CD Automation:** GitHub Actions (`.github/workflows/deploy.yml`) running on push to `main` (and manual `workflow_dispatch`).
 - **Target URL:** `https://ahmostafa.github.io/tactical-board-next/`
 - **Cost:** \$0 / month forever.
 - **Privacy & Non-Google Policy:**
@@ -50,7 +50,7 @@ Before the first deployment workflow can publish, GitHub Pages must be configure
 2. Navigate to **Settings** > **Pages** (in the left sidebar).
 3. Under **Build and deployment** > **Source**:
    - Change from *Deploy from a branch* to **GitHub Actions**.
-4. That's it! Every future push to `main` or release tag (`v*`) will trigger `.github/workflows/deploy.yml` and publish live in approximately 60 seconds.
+4. That's it! Every future push to `main` will trigger `.github/workflows/deploy.yml` and publish live in approximately 60 seconds.
 
 ---
 
