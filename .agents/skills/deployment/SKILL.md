@@ -85,19 +85,19 @@ To monitor how many users visit the board and where they come from (country and 
 
 ### Setting Up Your Free Analytics Dashboard:
 1. Go to [https://www.goatcounter.com/signup](https://www.goatcounter.com/signup).
-2. Enter your desired site code (e.g. `tactical-board-next`).
+2. Enter your desired site code (`ammohamed`).
 3. Enter your email and choose a password (no credit card required).
 4. Verify that `src/index.html` has your matching code:
    ```html
    <script
-     data-goatcounter="https://tactical-board-next.goatcounter.com/count"
+     data-goatcounter="https://ammohamed.goatcounter.com/count"
      async
      src="//gc.zgo.at/count.js"
      data-goatcounter-settings='{"allow_local": false}'
    ></script>
    ```
    *Note: `allow_local: false` ensures local development runs on `localhost:4200` do not inflate your production metrics.*
-5. Log into `https://tactical-board-next.goatcounter.com` anytime to view real-time visitor statistics and geographic charts.
+5. Log into `https://ammohamed.goatcounter.com` anytime to view real-time visitor statistics and geographic charts.
 
 ---
 

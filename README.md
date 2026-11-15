@@ -5,7 +5,7 @@ A modern, responsive, browser-based football tactical board for match analysis, 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-Online-emerald?style=for-the-badge&logo=github)](https://ahmostafa.github.io/tactical-board-next/)
 [![Release](https://img.shields.io/badge/Release-v1.0.1-blue?style=for-the-badge)](https://github.com/ahmostafa/tactical-board-next/releases)
 [![License: ISC](https://img.shields.io/badge/License-ISC-amber?style=for-the-badge)](LICENSE)
-[![Privacy: Zero Cookies](https://img.shields.io/badge/Privacy-Zero%20Cookies%20%2F%20Non--Google-purple?style=for-the-badge)](https://tactical-board-next.goatcounter.com)
+[![Privacy: Zero Cookies](https://img.shields.io/badge/Privacy-Zero%20Cookies%20%2F%20Non--Google-purple?style=for-the-badge)](https://ammohamed.goatcounter.com)
 
 > **Live Application:** [https://ahmostafa.github.io/tactical-board-next/](https://ahmostafa.github.io/tactical-board-next/)  
 > Free forever, 100% ad-free, secure HTTPS, and privacy-first (no Google tracking, no cookies).
@@ -240,7 +240,7 @@ Tactical Board Next is deployed as a high-performance, globally distributed Sing
 - **Visitor Statistics (GoatCounter):**
   - Powered by open-source [GoatCounter](https://www.goatcounter.com).
   - Tracks total visits, daily unique users, and **geographic distribution (country & region breakdown)**.
-  - Dashboard: [https://tactical-board-next.goatcounter.com](https://tactical-board-next.goatcounter.com)
+  - Dashboard: [https://ammohamed.goatcounter.com](https://ammohamed.goatcounter.com)
 - **CI/CD Pipeline:** Automated GitHub Actions workflow (`.github/workflows/deploy.yml`) enforces `npx tsc --noEmit` and `npm test` unit test gates before building and deploying on every push to `main` (and manual `workflow_dispatch`).
 - **In-App About, Version Display & 404/500 Resilience:** Includes an interactive `ℹ About (v1.0.1)` modal, a `404 — Out of Bounds` recovery route backed by `404.html`, and a global runtime error boundary with clean-state recovery.
 - **Detailed Guides:**
