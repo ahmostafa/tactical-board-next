@@ -80,6 +80,8 @@ import { EquipmentPaletteComponent } from './components/equipment-palette.compon
 import { TokenInspectorComponent } from './components/token-inspector.component';
 import { CollectionsDrawerComponent } from './components/collections-drawer.component';
 import { TimelineBarComponent } from './components/timeline-bar.component';
+import { AboutModalComponent } from './components/about-modal.component';
+import { APP_VERSION } from '../../environments/version';
 
 export { TEAM_COLOR_PRESETS, DRAWING_COLORS, CURSORS, BOARD_ZOOM_LEVELS };
 export type { PitchViewMode, ActiveToolMode };
@@ -93,6 +95,7 @@ export type { PitchViewMode, ActiveToolMode };
     TokenInspectorComponent,
     CollectionsDrawerComponent,
     TimelineBarComponent,
+    AboutModalComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './pitch-board.component.html',
@@ -110,8 +113,10 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
   protected readonly equipmentCatalog = EQUIPMENT_CATALOG;
   protected readonly demoTactics = DEMO_TACTICS;
   protected readonly tourSteps = TOUR_STEPS;
+  protected readonly appVersion = APP_VERSION;
 
   // UI Signals
+  showAbout = signal(false);
   activeTool = signal<ActiveToolMode>('move');
   isDrawingMode = computed(() => this.activeTool() !== 'move');
   arrowStyle = signal<ArrowStyle>('pass');
@@ -382,6 +387,10 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
         return;
       }
       if (event.key === 'Escape') {
+        if (this.showAbout()) {
+          this.showAbout.set(false);
+          return;
+        }
         this.activeTool.set('move');
         this.selectedEntityId.set(null);
         this.updateDraggable();
@@ -669,7 +678,11 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     this.showStatus('Removed from pitch');
   }
 
-  // ---- Interactive Feature Tour & Built-in Demos ----
+  // ---- Interactive Feature Tour, About & Built-in Demos ----
+  toggleAbout() {
+    this.showAbout.set(!this.showAbout());
+  }
+
   toggleTour() {
     const next = !this.showTour();
     this.showTour.set(next);

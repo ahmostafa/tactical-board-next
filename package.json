@@ -1,10 +1,12 @@
 {
   "name": "tactical-board-next",
-  "version": "0.0.0",
+  "version": "1.0.1",
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
     "build": "ng build",
+    "build:prod": "ng build --configuration production && node scripts/copy-404.mjs",
+    "build:gh-pages": "ng build --configuration production --base-href /tactical-board-next/ && node scripts/copy-404.mjs",
     "watch": "ng build --watch --configuration development",
     "test": "ng test"
   },

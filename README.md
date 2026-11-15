@@ -2,6 +2,14 @@
 
 A modern, responsive, browser-based football tactical board for match analysis, set-piece design, and coaching sessions. Drag players, referees, and training equipment at 60fps, switch instant 11v11 formations, sketch curved tactical arrows in six styles, highlight tactical zones, animate multi-step plays on a keyframe timeline, organize schemes in a Collections Library, and export HD `.mp4` videos, animated `.gif` files, and `2x` `.png` images directly in the browser.
 
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Online-emerald?style=for-the-badge&logo=github)](https://ahmostafa.github.io/tactical-board-next/)
+[![Release](https://img.shields.io/badge/Release-v1.0.1-blue?style=for-the-badge)](https://github.com/ahmostafa/tactical-board-next/releases)
+[![License: ISC](https://img.shields.io/badge/License-ISC-amber?style=for-the-badge)](LICENSE)
+[![Privacy: Zero Cookies](https://img.shields.io/badge/Privacy-Zero%20Cookies%20%2F%20Non--Google-purple?style=for-the-badge)](https://tactical-board-next.goatcounter.com)
+
+> **Live Application:** [https://ahmostafa.github.io/tactical-board-next/](https://ahmostafa.github.io/tactical-board-next/)  
+> Free forever, 100% ad-free, secure HTTPS, and privacy-first (no Google tracking, no cookies).
+
 ![Animated tactical sequence with arrows and player movements](docs/board-animation.gif)
 
 > **Exported HD Video Demos (1280×720, 30 fps, H.264 Main Profile + AAC via FFmpeg.wasm):**
@@ -216,7 +224,39 @@ npm test
 - [x] Keyframe timeline engine: `Play`, `Play Step`, `Loop`, scrub slider, step duration control, and ghost trails
 - [x] Client-side `2x` PNG, animated GIF, and 720p H.264 MP4 video export with FFmpeg.wasm
 - [x] Collections Library (up to 1,000 schemes), `.json` import/export, and `#scheme=` shareable URLs
+- [x] Automated GitHub Pages CI/CD deployment (`deploy.yml`), SPA routing fallback (`404.html`), and privacy-first non-Google visitor analytics (GoatCounter)
 - [ ] AI-driven tactical setups via natural language (planned in a dedicated phase)
+
+## Production Deployment & Visitor Statistics
+
+Tactical Board Next is deployed as a high-performance, globally distributed Single Page Application:
+
+- **Live URL:** [https://ahmostafa.github.io/tactical-board-next/](https://ahmostafa.github.io/tactical-board-next/)
+- **100% Free & Ad-Free:** Zero hosting costs, zero ads, and no premium gates.
+- **Strictly Non-Google & Privacy-First:**
+  - No Google Cloud, Firebase, Google Analytics (GA4), or Google Tag Manager.
+  - No tracking cookies, cross-site profiling, or personal identification.
+  - Fully GDPR/CCPA compliant without needing an annoying cookie consent banner.
+- **Visitor Statistics (GoatCounter):**
+  - Powered by open-source [GoatCounter](https://www.goatcounter.com).
+  - Tracks total visits, daily unique users, and **geographic distribution (country & region breakdown)**.
+  - Dashboard: [https://tactical-board-next.goatcounter.com](https://tactical-board-next.goatcounter.com)
+- **CI/CD Pipeline:** Automated GitHub Actions workflow (`.github/workflows/deploy.yml`) enforces `npx tsc --noEmit` and `npm test` unit test gates before building and deploying on every push to `main` and on version tags (`v*`).
+- **In-App About, Version Display & 404/500 Resilience:** Includes an interactive `ℹ About (v1.0.1)` modal, a `404 — Out of Bounds` recovery route backed by `404.html`, and a global runtime error boundary with clean-state recovery.
+- **Detailed Guides:**
+  - [Production Deployment Skill](.agents/skills/deployment/SKILL.md)
+  - [Release Planning & Quality Gates Skill](.agents/skills/release-planning/SKILL.md)
+
+### Hosting & Analytics Free Tier Limits (Guarantee of \$0.00 Charge)
+
+| Service | Bandwidth / Traffic Limit | Build Limit | What Happens If Exceeded? | Risk of Charge |
+| :--- | :--- | :--- | :--- | :--- |
+| **GitHub Pages + Actions** *(Primary)* | **100 GB / month** (~700k visits) | **Unlimited** minutes (public repo) | Temporary throttling / email alert; never bills | **0.00%** |
+| **Cloudflare Pages** *(Alternative)* | **Unlimited** bandwidth | **500 builds / month** | Pauses new builds until next month | **0.00%** |
+| **GoatCounter** *(Analytics)* | **100,000 views / month** | N/A | Displays polite sponsor notice; never bills | **0.00%** |
+| **Netlify / Vercel** *(Avoided)* | 100 GB / month | 300 mins / month | May auto-bill \$55/100 GB overages | **High Risk** |
+
+> **How to guarantee you are never charged \$0.01:** Never add a credit card to GitHub or GoatCounter, and verify under **GitHub Settings > Billing and plans > Plans and usage > Spending limits** that your Actions/Packages limit remains set at **`$0.00 USD`**.
 
 ## Release Milestones & Version History
 
@@ -224,6 +264,7 @@ This repository follows [Semantic Versioning (SemVer)](https://semver.org/) (`vM
 
 | Version | Milestone Commit | Description & Key Features |
 | :--- | :--- | :--- |
+| **`v1.0.1`** | `HEAD` | **Production Deployment, Resilience & Privacy Analytics**: Automated GitHub Pages CI/CD with mandatory unit-test gate (`deploy.yml`), About modal with live version badge, 404 Out-of-Bounds & 500 error recovery views, SPA `404.html` fallback, privacy-friendly GoatCounter analytics (visitor counts + country demographics, zero cookies, non-Google), and hosting limit documentation. |
 | **`v1.0.0`** | `73d13af` | **Official v1.0.0 Release**: Full FIFA `105m × 68m` pitch divisions (3 Thirds, 5 Channels, 18-Zone, 20-Zone *Juego de Posición*), specialized sub-zones (Zone 14, Golden Zone, Pockets, Cutbacks), live token coordinate badge, live *Juego de Posición* spacing rules checker, and smooth linear zoom scaling. |
 | **`v0.5.0`** | `f611977` | **Pragmatic Angular 22 Architecture**: Modularized into domain models (`models/`), state sanitizer (`state/`), pure Konva renderers (`canvas/pitch-renderer`, `arrow-renderer`, `entity-renderer`), injectable `BoardExportService` (`services/`), and 5 standalone UI sub-components (`components/`). |
 | **`v0.4.0`** | `898ee6b` | **Empty Pitch & Drill Suite**: Empty Pitch Free Build mode, squad presets (`11v11`–`5v5`), drag-and-drop palette, 9 training equipment types, 6-step interactive tour (`? Tour`), and 3 animated demo tactics. |

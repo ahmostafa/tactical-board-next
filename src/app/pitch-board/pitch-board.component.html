@@ -119,6 +119,16 @@
             title="Interactive step-by-step guide to all features">
       ? Tour
     </button>
+    <button (click)="toggleAbout()"
+            data-testid="about-button"
+            class="px-2.5 py-1.5 text-xs font-bold rounded shadow-md transition-colors"
+            [class.bg-emerald-500]="showAbout()"
+            [class.text-gray-950]="showAbout()"
+            [class.bg-gray-700]="!showAbout()"
+            [class.text-white]="!showAbout()"
+            title="About Tactical Board Next & Version Info">
+      ℹ About ({{ appVersion }})
+    </button>
     <button (click)="resetBoard()"
             class="px-3 py-1.5 text-xs bg-gray-700 text-white font-bold rounded shadow-md">Reset</button>
     @if (statusMessage()) {
@@ -140,6 +150,10 @@
     (closeTour)="showTour.set(false)"
     (closeDemos)="showDemos.set(false)"
     (loadDemo)="loadDemoTactic($event.demo, $event.autoPlay)" />
+
+  @if (showAbout()) {
+    <app-about-modal (closeModal)="showAbout.set(false)" />
+  }
 
   <!-- Row 2: Squad Mode, Formations, Team Colors, Pitch Views, Zoom, Drawing Palette & Equipment Toggle -->
   <fieldset class="flex flex-wrap items-center gap-2.5 mb-2 px-3 py-2 rounded bg-gray-800/90 text-xs border-0 m-0 min-w-0" [disabled]="isPlaying() || isExporting()">
