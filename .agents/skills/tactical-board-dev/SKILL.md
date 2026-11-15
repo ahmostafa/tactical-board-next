@@ -45,5 +45,10 @@ Dev-server gotchas: after editing `angular.json` or installing packages restart 
 - Human, specific commit messages: a subject line plus a short body explaining why. **Never** mention AI, assistants, Copilot, Claude, Gemini or generation, in commits, code comments or README.
 - `git add/commit/push` need `BypassSandbox: true` (`.git/index.lock` and network). One logical change per commit; media goes with the README change that uses it.
 
+## Public README vs Internal Skills Separation (Strict Rule)
+- `README.md` is strictly user-facing product documentation for football coaches, analysts, and players. It must only contain product capabilities, visual screenshots, demo animations, user instructions, and a clean release history.
+- **NEVER** push internal architectural plan comparisons, hosting option matrices, billing/limit risk evaluations, `$0.00` spending limit instructions, or private development workflow tutorials to `README.md`.
+- All internal engineering decisions, hosting comparisons, cost protection instructions, and git tutorial commands belong exclusively in `.agents/skills/` (such as `deployment/SKILL.md` and `release-planning/SKILL.md`) for maintainer reference.
+
 ## Definition of done
 Type check passes, feature verified in the browser (see `tactical-board-testing`), README and screenshots updated if user-visible, committed and pushed.

@@ -109,11 +109,67 @@ git push origin main --tags
 1. Open `https://github.com/ahmostafa/tactical-board-next/actions`.
 2. Watch the `Deploy Tactical Board Next to GitHub Pages` workflow run.
 3. Open the production URL `https://ahmostafa.github.io/tactical-board-next/` and verify live operation.
-4. Check GoatCounter analytics dashboard (`https://tactical-board-next.goatcounter.com`) to confirm live telemetry is recording.
+4. Check GoatCounter analytics dashboard (`https://ammohamed.goatcounter.com`) to confirm live telemetry is recording.
 
 ---
 
-## 4. Hotfix Procedure
+## 4. Git Versioning Reference (Tagging & Branching Commands)
+
+### Creating Annotated Tags
+```bash
+# Tag current HEAD commit:
+git tag -a v1.0.1 -m "Release v1.0.1: production deployment and resilience"
+
+# Tag a past commit retroactively:
+git tag -a v0.4.0 898ee6b -m "v0.4.0: empty pitch mode and training equipment"
+```
+
+### Inspecting Tags
+```bash
+# List all tags:
+git tag -l
+
+# List tags with release annotations:
+git tag -n
+
+# Inspect full tag details (tagger, date, commit):
+git show v1.0.1
+```
+
+### Pushing Tags to Remote
+```bash
+# Push all local tags:
+git push origin --tags
+
+# Push a single tag:
+git push origin v1.0.1
+```
+
+### Inspecting or Branching from a Version Tag
+```bash
+# Detached HEAD read-only inspection:
+git checkout v0.4.0
+
+# Branch off a tag for maintenance or bug backporting:
+git checkout -b maintenance/v0.4-patch v0.4.0
+```
+
+### Standard GitHub Flow Branching
+1. `main`: Permanent production branch. Always clean, tested, and deployable.
+2. `feat/<name>` or `fix/<name>`: Feature/fix branches.
+   ```bash
+   git checkout -b feat/new-feature main
+   # make changes, run tests
+   git checkout main
+   git merge feat/new-feature
+   git tag -a v1.1.0 -m "feat: description of release"
+   git push origin main --tags
+   git branch -d feat/new-feature
+   ```
+
+---
+
+## 5. Hotfix Procedure
 
 If an urgent bug is discovered in production:
 1. Create a hotfix branch from `main`:

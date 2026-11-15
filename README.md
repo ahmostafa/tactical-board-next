@@ -5,7 +5,7 @@ A modern, responsive, browser-based football tactical board for match analysis, 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-Online-emerald?style=for-the-badge&logo=github)](https://ahmostafa.github.io/tactical-board-next/)
 [![Release](https://img.shields.io/badge/Release-v1.0.1-blue?style=for-the-badge)](https://github.com/ahmostafa/tactical-board-next/releases)
 [![License: ISC](https://img.shields.io/badge/License-ISC-amber?style=for-the-badge)](LICENSE)
-[![Privacy: Zero Cookies](https://img.shields.io/badge/Privacy-Zero%20Cookies%20%2F%20Non--Google-purple?style=for-the-badge)](https://ammohamed.goatcounter.com)
+[![Privacy: Zero Cookies](https://img.shields.io/badge/Privacy-Zero%20Cookies-purple?style=for-the-badge)](#)
 
 > **Live Application:** [https://ahmostafa.github.io/tactical-board-next/](https://ahmostafa.github.io/tactical-board-next/)  
 > Free forever, 100% ad-free, secure HTTPS, and privacy-first (no Google tracking, no cookies).
@@ -227,36 +227,13 @@ npm test
 - [x] Automated GitHub Pages CI/CD deployment (`deploy.yml`), SPA routing fallback (`404.html`), and privacy-first non-Google visitor analytics (GoatCounter)
 - [ ] AI-driven tactical setups via natural language (planned in a dedicated phase)
 
-## Production Deployment & Visitor Statistics
+## Live Application
 
-Tactical Board Next is deployed as a high-performance, globally distributed Single Page Application:
+Tactical Board Next is available online:
 
 - **Live URL:** [https://ahmostafa.github.io/tactical-board-next/](https://ahmostafa.github.io/tactical-board-next/)
-- **100% Free & Ad-Free:** Zero hosting costs, zero ads, and no premium gates.
-- **Strictly Non-Google & Privacy-First:**
-  - No Google Cloud, Firebase, Google Analytics (GA4), or Google Tag Manager.
-  - No tracking cookies, cross-site profiling, or personal identification.
-  - Fully GDPR/CCPA compliant without needing an annoying cookie consent banner.
-- **Visitor Statistics (GoatCounter):**
-  - Powered by open-source [GoatCounter](https://www.goatcounter.com).
-  - Tracks total visits, daily unique users, and **geographic distribution (country & region breakdown)**.
-  - Dashboard: [https://ammohamed.goatcounter.com](https://ammohamed.goatcounter.com)
-- **CI/CD Pipeline:** Automated GitHub Actions workflow (`.github/workflows/deploy.yml`) enforces `npx tsc --noEmit` and `npm test` unit test gates before building and deploying on every push to `main` (and manual `workflow_dispatch`).
-- **In-App About, Version Display & 404/500 Resilience:** Includes an interactive `ℹ About (v1.0.1)` modal, a `404 — Out of Bounds` recovery route backed by `404.html`, and a global runtime error boundary with clean-state recovery.
-- **Detailed Guides:**
-  - [Production Deployment Skill](.agents/skills/deployment/SKILL.md)
-  - [Release Planning & Quality Gates Skill](.agents/skills/release-planning/SKILL.md)
-
-### Hosting & Analytics Free Tier Limits (Guarantee of \$0.00 Charge)
-
-| Service | Bandwidth / Traffic Limit | Build Limit | What Happens If Exceeded? | Risk of Charge |
-| :--- | :--- | :--- | :--- | :--- |
-| **GitHub Pages + Actions** *(Primary)* | **100 GB / month** (~700k visits) | **Unlimited** minutes (public repo) | Temporary throttling / email alert; never bills | **0.00%** |
-| **Cloudflare Pages** *(Alternative)* | **Unlimited** bandwidth | **500 builds / month** | Pauses new builds until next month | **0.00%** |
-| **GoatCounter** *(Analytics)* | **100,000 views / month** | N/A | Displays polite sponsor notice; never bills | **0.00%** |
-| **Netlify / Vercel** *(Avoided)* | 100 GB / month | 300 mins / month | May auto-bill \$55/100 GB overages | **High Risk** |
-
-> **How to guarantee you are never charged \$0.01:** Never add a credit card to GitHub or GoatCounter, and verify under **GitHub Settings > Billing and plans > Plans and usage > Spending limits** that your Actions/Packages limit remains set at **`$0.00 USD`**.
+- **100% Free & Open Source:** Free for coaches, analysts, and clubs worldwide with zero ads.
+- **Privacy-First:** Strictly non-Google, zero tracking cookies, and fully GDPR/CCPA compliant.
 
 ## Release Milestones & Version History
 
@@ -264,85 +241,13 @@ This repository follows [Semantic Versioning (SemVer)](https://semver.org/) (`vM
 
 | Version | Milestone Commit | Description & Key Features |
 | :--- | :--- | :--- |
-| **`v1.0.1`** | `HEAD` | **Production Deployment, Resilience & Privacy Analytics**: Automated GitHub Pages CI/CD with mandatory unit-test gate (`deploy.yml`), About modal with live version badge, 404 Out-of-Bounds & 500 error recovery views, SPA `404.html` fallback, privacy-friendly GoatCounter analytics (visitor counts + country demographics, zero cookies, non-Google), and hosting limit documentation. |
+| **`v1.0.1`** | `8425cef` | **Production Deployment & Resilience**: Automated GitHub Pages CI/CD pipeline, About dialog with live version badge, 404 Out-of-Bounds and runtime error recovery, SPA fallback routing, and privacy-friendly visitor analytics. |
 | **`v1.0.0`** | `73d13af` | **Official v1.0.0 Release**: Full FIFA `105m × 68m` pitch divisions (3 Thirds, 5 Channels, 18-Zone, 20-Zone *Juego de Posición*), specialized sub-zones (Zone 14, Golden Zone, Pockets, Cutbacks), live token coordinate badge, live *Juego de Posición* spacing rules checker, and smooth linear zoom scaling. |
 | **`v0.5.0`** | `f611977` | **Pragmatic Angular 22 Architecture**: Modularized into domain models (`models/`), state sanitizer (`state/`), pure Konva renderers (`canvas/pitch-renderer`, `arrow-renderer`, `entity-renderer`), injectable `BoardExportService` (`services/`), and 5 standalone UI sub-components (`components/`). |
 | **`v0.4.0`** | `898ee6b` | **Empty Pitch & Drill Suite**: Empty Pitch Free Build mode, squad presets (`11v11`–`5v5`), drag-and-drop palette, 9 training equipment types, 6-step interactive tour (`? Tour`), and 3 animated demo tactics. |
 | **`v0.3.0`** | `e10efa3` | **Realistic Pitch Geometry**: Outer boundary stadium apron, protruding 3D woven goal nets, 7 instant formations, custom team colors, and Collections library. |
 | **`v0.2.0`** | `5fab12d` | **Timeline & Video Export**: Multi-step keyframe timeline, `Konva.Tween` playback, scrubber, ghost trails, and client-side H.264 MP4 & GIF export via `FFmpeg.wasm`. |
 | **`v0.1.0`** | `436147b` | **Core Interactive Board**: Proportional 11v11 pitch, 22 players, classic black/white football, undo/redo, and initial analytical divisions overlay. |
-
----
-
-## Git Versioning & Release Guide (How It Works)
-
-Git tags provide permanent, unchangeable bookmarks to specific commits in your repository's history, allowing you to track releases, download snapshots, or roll back to any past version.
-
-### 1. Semantic Versioning Format (`vMAJOR.MINOR.PATCH`)
-- **`MAJOR` (e.g. `v1.0.0` → `v2.0.0`)**: Large milestone releases or architectural overhauls.
-- **`MINOR` (e.g. `v1.0.0` → `v1.1.0`)**: New backward-compatible features (e.g., adding a new arrow style or drill tool).
-- **`PATCH` (e.g. `v1.0.0` → `v1.0.1`)**: Backward-compatible bug fixes or visual adjustments (e.g., smoothing zoom steps).
-
-### 2. Creating Annotated Tags
-An **annotated tag** stores the tagger name, email, date, and a descriptive release message:
-
-```bash
-# Tag the current HEAD commit:
-git tag -a v1.0.0 -m "v1.0.0 - Official v1.0 release with tactical divisions and spacing rules"
-
-# Tag a past commit retroactively by providing its commit hash:
-git tag -a v0.4.0 898ee6b -m "v0.4.0 - Empty pitch mode and drag-and-drop equipment suite"
-```
-
-### 3. Inspecting Tags
-```bash
-# List all tags:
-git tag -l
-
-# List tags with their annotation messages:
-git tag -n
-
-# View full details (tagger, date, commit, and diff summary) for a specific tag:
-git show v1.0.0
-```
-
-### 4. Pushing Tags to GitHub
-Tags are not pushed by standard `git push origin main`. They must be pushed explicitly:
-
-```bash
-# Push all local tags to the remote repository:
-git push origin --tags
-
-# Push a single tag to the remote repository:
-git push origin v1.0.0
-```
-
-### 5. Checking Out or Branching from a Version Tag
-Tags are read-only references. To test or work on an older version:
-
-```bash
-# Switch to a tagged version in detached HEAD state (read-only inspection):
-git checkout v0.4.0
-
-# Create a new branch starting from a specific version (e.g. for maintenance or backporting a fix):
-git checkout -b maintenance/v0.4-patch v0.4.0
-```
-
-### 6. Standard Branching Workflow Going Forward (GitHub Flow)
-1. **`main`**: Permanent production branch. Always stable, build-tested, and tagged.
-2. **`feat/<feature-name>`** or **`fix/<bug-name>`**: Create a branch for any new feature or fix:
-   ```bash
-   git checkout -b feat/pdf-export main
-   ```
-3. Make commits, verify with `npx tsc --noEmit` and `npm test`.
-4. Merge into `main` and tag the new version:
-   ```bash
-   git checkout main
-   git merge feat/pdf-export
-   git tag -a v1.1.0 -m "feat: add vector PDF export for tactical schemes"
-   git push origin main --tags
-   git branch -d feat/pdf-export
-   ```
 
 ---
 
