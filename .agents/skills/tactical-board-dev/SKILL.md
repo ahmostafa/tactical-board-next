@@ -38,8 +38,10 @@ npm test                       # vitest via ng test
 ```
 Dev-server gotchas: after editing `angular.json` or installing packages restart `ng serve`. `npm install` needs network (run unsandboxed).
 
-## Git rules (strict)
+## Git rules & Versioning (strict)
 - Author: `Ahmed Mohamed <engahmed.mostafa@yahoo.com>`; branch `main`; remote `origin` (github.com/ahmostafa/tactical-board-next).
+- Branching workflow: Use GitHub Flow (`main` for release-ready code + tagged releases, `feat/<name>` or `fix/<name>` for new work).
+- Semantic versioning: Tag releases as `vMAJOR.MINOR.PATCH` with annotated tags (`git tag -a vX.Y.Z -m "..."`) and push via `git push origin --tags`.
 - Human, specific commit messages: a subject line plus a short body explaining why. **Never** mention AI, assistants, Copilot, Claude, Gemini or generation, in commits, code comments or README.
 - `git add/commit/push` need `BypassSandbox: true` (`.git/index.lock` and network). One logical change per commit; media goes with the README change that uses it.
 
