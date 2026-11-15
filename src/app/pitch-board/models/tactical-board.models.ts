@@ -177,7 +177,7 @@ export const HALF_VIEW_W = PITCH_PAD_X + 525 + 7; // 568 (even width: outer apro
 
 export const STORAGE_KEY = 'tactical-board:v1';
 
-export const BOARD_ZOOM_LEVELS = [0.7, 0.8, 0.9, 1, 1.15, 1.3, 1.5, 1.75, 2];
+export const BOARD_ZOOM_LEVELS = [0.7, 0.8, 0.85, 0.9, 0.95, 1, 1.05, 1.1, 1.15, 1.2, 1.3, 1.5, 1.75, 2];
 
 export const TEAM_COLOR_PRESETS = [
   { name: 'Red', hex: '#e74c3c' },

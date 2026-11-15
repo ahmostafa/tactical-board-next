@@ -160,14 +160,9 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
   containerMaxWidth = computed(() => {
     const z = this.boardZoom();
     const v = this.pitchView();
-    if (z <= 0.9) {
-      if (v === 'vertical') return `min(${Math.round(490 * z)}px, calc((100dvh - 210px) * 0.648 * ${z}))`;
-      if (v === 'half-left' || v === 'half-right') return `min(${Math.round(550 * z)}px, calc((100dvh - 210px) * 0.779 * ${z}))`;
-      return `min(${Math.round(920 * z)}px, calc((100dvh - 210px) * 1.541 * ${z}))`;
-    }
-    if (v === 'vertical') return `${Math.round(520 * z)}px`;
-    if (v === 'half-left' || v === 'half-right') return `${Math.round(580 * z)}px`;
-    return `${Math.round(960 * z)}px`;
+    if (v === 'vertical') return `${Math.round(480 * z)}px`;
+    if (v === 'half-left' || v === 'half-right') return `${Math.round(540 * z)}px`;
+    return `${Math.round(900 * z)}px`;
   });
 
   selectedEntityId = signal<string | null>(null);
