@@ -123,6 +123,8 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
   showPitchSettings = signal(false);
   showMobileTools = signal(true);
   briefingMode = signal(false);
+  mobileSection = signal<'tools' | 'settings' | 'equipment' | 'timeline' | 'none'>('tools');
+  mobileCategory = signal<'move' | 'arrows' | 'shapes' | 'grid' | 'bench'>('move');
   activeTool = signal<ActiveToolMode>('move');
   isDrawingMode = computed(() => this.activeTool() !== 'move');
   arrowStyle = signal<ArrowStyle>('pass');
@@ -714,6 +716,47 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     this.showPitchSettings.update((v) => !v);
   }
 
+  setMobileSection(sec: 'tools' | 'settings' | 'equipment' | 'timeline' | 'none') {
+    if (this.mobileSection() === sec) {
+      this.mobileSection.set('none');
+    } else {
+      this.mobileSection.set(sec);
+      if (sec === 'equipment') this.showEquipmentTray.set(true);
+      if (sec === 'settings') this.showPitchSettings.set(true);
+      if (sec === 'tools' && !this.isDrawingMode()) this.toggleDrawingMode();
+    }
+  }
+
+  setMobileCategory(cat: 'move' | 'arrows' | 'shapes' | 'grid' | 'bench') {
+    this.mobileCategory.set(cat);
+    if (cat === 'move') {
+      this.activeTool.set('move');
+      this.showEquipmentTray.set(false);
+      this.showDivisionsPanel.set(false);
+    } else if (cat === 'arrows') {
+      this.activeTool.set('arrow');
+      this.showEquipmentTray.set(false);
+      this.showDivisionsPanel.set(false);
+    } else if (cat === 'shapes') {
+      this.activeTool.set('shape');
+      this.showEquipmentTray.set(false);
+      this.showDivisionsPanel.set(false);
+    } else if (cat === 'grid') {
+      this.showDivisionsPanel.set(true);
+      this.showEquipmentTray.set(false);
+      if (!this.showDivisions()) {
+        this.divisionsConfig.update((c) => ({ ...c, grid: 'thirds-channels' }));
+        this.refreshDivisionsLayer();
+      }
+    } else if (cat === 'bench') {
+      this.showEquipmentTray.set(true);
+      this.showDivisionsPanel.set(false);
+    }
+    this.selectedEntityId.set(null);
+    this.updateDraggable();
+    this.syncFromStore();
+  }
+
   toggleTour() {
     const next = !this.showTour();
     this.showTour.set(next);
@@ -1063,7 +1106,9 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
   }
 
   toggleDrawingMode() {
-    this.activeTool.set(this.isDrawingMode() ? 'move' : 'arrow');
+    const next = this.isDrawingMode() ? 'move' : 'arrow';
+    this.activeTool.set(next);
+    this.mobileCategory.set(next === 'move' ? 'move' : 'arrows');
     this.selectedEntityId.set(null);
     this.updateDraggable();
     this.syncFromStore();
@@ -1072,6 +1117,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
   selectArrowStyle(style: ArrowStyle) {
     this.arrowStyle.set(style);
     this.activeTool.set('arrow');
+    this.mobileCategory.set('arrows');
     this.selectedEntityId.set(null);
     this.updateDraggable();
     this.syncFromStore();
@@ -1080,6 +1126,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
   selectShapeTool(kind: ShapeKind) {
     this.shapeKind.set(kind);
     this.activeTool.set('shape');
+    this.mobileCategory.set('shapes');
     this.selectedEntityId.set(null);
     this.updateDraggable();
     this.syncFromStore();
@@ -1087,6 +1134,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
 
   selectTextTool() {
     this.activeTool.set('text');
+    this.mobileCategory.set('shapes');
     this.selectedEntityId.set(null);
     this.updateDraggable();
     this.syncFromStore();
@@ -1094,7 +1142,9 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
   }
 
   selectEraserTool() {
-    this.activeTool.set(this.activeTool() === 'eraser' ? 'move' : 'eraser');
+    const next = this.activeTool() === 'eraser' ? 'move' : 'eraser';
+    this.activeTool.set(next);
+    this.mobileCategory.set(next === 'move' ? 'move' : 'shapes');
     this.selectedEntityId.set(null);
     this.updateDraggable();
     this.syncFromStore();
