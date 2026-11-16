@@ -36,7 +36,7 @@
     <div class="flex items-center gap-1.5 ml-auto">
       <!-- Collections Library Button -->
       <button (click)="showCollections.set(!showCollections())"
-              class="px-3 py-1.5 min-h-[38px] text-xs font-bold rounded-md border transition-all flex items-center gap-1.5 shadow-sm"
+              class="px-2.5 sm:px-3 py-1.5 min-h-[38px] text-xs font-bold rounded-md border transition-all flex items-center gap-1.5 shadow-sm shrink-0"
               [class.bg-teal-600]="showCollections()"
               [class.text-white]="showCollections()"
               [class.border-teal-500]="showCollections()"
@@ -50,12 +50,13 @@
               [class.dark:hover:bg-gray-700]="!showCollections()"
               title="Open multi-board Collections library and JSON import/export">
         <span>📁</span>
-        <span>Collections ({{ collections().length }})</span>
+        <span class="hidden sm:inline">Collections</span>
+        <span class="text-[11px]">({{ collections().length }})</span>
       </button>
 
       <!-- Share Link Button -->
       <button (click)="shareSchemeLink()"
-              class="px-3 py-1.5 min-h-[38px] text-xs font-bold rounded-md border border-sky-600/40 bg-sky-600 hover:bg-sky-500 text-white shadow-sm transition-colors flex items-center gap-1.5"
+              class="px-2.5 sm:px-3 py-1.5 min-h-[38px] text-xs font-bold rounded-md border border-sky-600/40 bg-sky-600 hover:bg-sky-500 text-white shadow-sm transition-colors flex items-center gap-1.5 shrink-0"
               title="Copy a shareable link encoding the entire board and animation">
         <span>🔗</span>
         <span class="hidden sm:inline">Share Link</span>
@@ -63,7 +64,7 @@
 
       <!-- Theme Switcher: Daylight Touchline vs Locker Room OLED -->
       <button (click)="toggleTheme()"
-              class="px-2.5 py-1.5 min-h-[38px] text-xs font-semibold rounded-md border border-slate-300 dark:border-gray-700 bg-slate-100 dark:bg-gray-800 hover:bg-slate-200 dark:hover:bg-gray-700 text-slate-800 dark:text-slate-100 transition-colors flex items-center gap-1.5 shadow-sm"
+              class="px-2.5 py-1.5 min-h-[38px] text-xs font-semibold rounded-md border border-slate-300 dark:border-gray-700 bg-slate-100 dark:bg-gray-800 hover:bg-slate-200 dark:hover:bg-gray-700 text-slate-800 dark:text-slate-100 transition-colors flex items-center gap-1.5 shadow-sm shrink-0"
               [title]="themeService.isDark() ? 'Switch to Daylight Touchline Mode' : 'Switch to Locker Room OLED Mode'">
         @if (themeService.isDark()) {
           <span class="text-amber-400">☀️</span>
@@ -76,7 +77,7 @@
 
       <!-- Briefing / Zen Mode Toggle -->
       <button (click)="toggleBriefingMode()"
-              class="px-2.5 py-1.5 min-h-[38px] text-xs font-semibold rounded-md border transition-colors flex items-center gap-1.5 shadow-sm"
+              class="px-2.5 py-1.5 min-h-[38px] text-xs font-semibold rounded-md border transition-colors flex items-center gap-1.5 shadow-sm shrink-0"
               [class.bg-purple-600]="briefingMode()"
               [class.text-white]="briefingMode()"
               [class.border-purple-500]="briefingMode()"
@@ -95,7 +96,7 @@
 
       <!-- Match & Pitch Settings Toggle -->
       <button (click)="togglePitchSettings()"
-              class="px-2.5 py-1.5 min-h-[38px] text-xs font-semibold rounded-md border transition-colors flex items-center gap-1.5 shadow-sm"
+              class="px-2.5 py-1.5 min-h-[38px] text-xs font-semibold rounded-md border transition-colors flex items-center gap-1.5 shadow-sm shrink-0"
               [class.bg-emerald-700]="showPitchSettings()"
               [class.text-white]="showPitchSettings()"
               [class.border-emerald-600]="showPitchSettings()"
@@ -113,9 +114,9 @@
       </button>
 
       <!-- More Actions Dropdown -->
-      <div class="relative">
+      <div class="relative shrink-0">
         <button (click)="toggleMoreMenu()"
-                class="px-3 py-1.5 min-h-[38px] text-xs font-bold rounded-md border border-slate-300 dark:border-gray-700 bg-slate-100 dark:bg-gray-800 hover:bg-slate-200 dark:hover:bg-gray-700 text-slate-800 dark:text-slate-100 transition-colors flex items-center gap-1 shadow-sm"
+                class="px-2.5 sm:px-3 py-1.5 min-h-[38px] text-xs font-bold rounded-md border border-slate-300 dark:border-gray-700 bg-slate-100 dark:bg-gray-800 hover:bg-slate-200 dark:hover:bg-gray-700 text-slate-800 dark:text-slate-100 transition-colors flex items-center gap-1 shadow-sm shrink-0"
                 title="More actions: Save, Load, Clear, Reset, Demos, Tour">
           <span>⋮ Actions</span>
         </button>

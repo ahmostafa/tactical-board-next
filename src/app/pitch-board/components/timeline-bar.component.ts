@@ -98,7 +98,7 @@ import { ChangeDetectionStrategy, Component, computed, input, output } from '@an
         </label>
         <input type="text"
                placeholder="Frame coaching note (e.g. Phase 1: High Press)..."
-               class="bg-[var(--tb-bg-surface-elevated)] text-[var(--tb-text-primary)] px-3 py-1.5 rounded-md border border-[var(--tb-border)] w-64 min-h-[32px]"
+               class="bg-[var(--tb-bg-surface-elevated)] text-[var(--tb-text-primary)] px-3 py-1.5 rounded-md border border-[var(--tb-border)] w-full sm:w-64 min-h-[36px]"
                [value]="note()"
                (input)="noteChange.emit($any($event.target).value)" />
       </div>

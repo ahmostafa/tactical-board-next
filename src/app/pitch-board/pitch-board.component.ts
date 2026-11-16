@@ -351,13 +351,14 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
           name: 'curve-handle',
           x: cx,
           y: cy,
-          radius: 6,
+          radius: 8,
+          hitStrokeWidth: 16,
           fill: '#ffffff',
           stroke: a.color ?? '#f1c40f',
           strokeWidth: 2,
-          opacity: 0.85,
+          opacity: 0.9,
           draggable: true,
-          dragBoundFunc: (pos) => this.clampStageDragPos(pos, 6),
+          dragBoundFunc: (pos) => this.clampStageDragPos(pos, 8),
         });
         handle.on('mouseenter', () => this.setStageCursor('grab'));
         handle.on('mouseleave', () => this.setStageCursor(this.defaultToolCursor()));
