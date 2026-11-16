@@ -40,6 +40,11 @@ testem.log
 __screenshots__/
 /scratch/
 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
 # System files
 .DS_Store
 Thumbs.db
