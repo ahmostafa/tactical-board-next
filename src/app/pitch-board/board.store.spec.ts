@@ -185,4 +185,29 @@ describe('BoardStore & Tactical Features', () => {
     ]);
     expect(crowdedChannel.some((v) => v.kind === 'channel' && v.code === 'LHS')).toBe(true);
   });
+
+  it('should support player vision cone toggle and 360-degree facing rotation with undo/redo', () => {
+    store.updateEntityMeta('h10', { showVision: true, facing: 0 });
+    let p10 = store.entities().find((e) => e.id === 'h10');
+    expect(p10?.showVision).toBe(true);
+    expect(p10?.facing).toBe(0);
+
+    // Rotate 360 degrees through cardinal angles
+    const testAngles = [45, 90, 180, 270, 315, 359];
+    for (const deg of testAngles) {
+      store.updateEntityMeta('h10', { facing: deg });
+      p10 = store.entities().find((e) => e.id === 'h10');
+      expect(p10?.facing).toBe(deg);
+    }
+
+    // Undo should restore previous angle
+    store.undo();
+    p10 = store.entities().find((e) => e.id === 'h10');
+    expect(p10?.facing).toBe(315);
+
+    // Redo should re-apply 359
+    store.redo();
+    p10 = store.entities().find((e) => e.id === 'h10');
+    expect(p10?.facing).toBe(359);
+  });
 });

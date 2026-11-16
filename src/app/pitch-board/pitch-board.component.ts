@@ -1509,6 +1509,13 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
         this.ngZone.run(() => this.store.updatePosition(id, x, y)),
       onRemoveEntity: (id) => this.ngZone.run(() => this.store.removeEntity(id)),
       onSelectEntity: (id) => this.ngZone.run(() => this.selectedEntityId.set(id)),
+      onUpdateEntityMeta: (id, patch) =>
+        this.ngZone.run(() => {
+          this.store.updateEntityMeta(id, patch);
+          if (patch.facing !== undefined) {
+            this.showStatus(`Player vision facing set to ${patch.facing}°`);
+          }
+        }),
     });
   }
 }

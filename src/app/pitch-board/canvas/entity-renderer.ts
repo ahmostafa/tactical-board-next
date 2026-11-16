@@ -29,6 +29,7 @@ export interface EntityRenderCallbacks {
   onUpdatePosition: (id: string, x: number, y: number) => void;
   onRemoveEntity: (id: string) => void;
   onSelectEntity: (id: string) => void;
+  onUpdateEntityMeta?: (id: string, patch: Partial<TacticalEntity>) => void;
 }
 
 export interface TextRenderCallbacks {
@@ -259,17 +260,159 @@ export function syncEntityNodes(
 
     if (!isBall && !isEquip && entity.showVision) {
       const facing = entity.facing ?? (entity.type === 'away' ? 180 : 0);
-      group.add(
-        new Konva.Wedge({
-          radius: 56,
-          angle: 64,
-          rotation: facing - 32,
-          fill: 'rgba(250, 204, 21, 0.22)',
-          stroke: 'rgba(250, 204, 21, 0.55)',
+      const isSelected = cb.selectedEntityId() === entity.id;
+      const canInteract = isMove && !cb.isPlaying() && !cb.isExporting();
+
+      const wedge = new Konva.Wedge({
+        radius: 56,
+        angle: 64,
+        rotation: facing - 32,
+        fill: 'rgba(250, 204, 21, 0.22)',
+        stroke: 'rgba(250, 204, 21, 0.55)',
+        strokeWidth: 1,
+        listening: canInteract,
+      });
+      group.add(wedge);
+
+      if (canInteract && isSelected) {
+        const handleRadius = 58;
+        const rad = (facing * Math.PI) / 180;
+        const hx = Math.cos(rad) * handleRadius;
+        const hy = Math.sin(rad) * handleRadius;
+
+        const guideLine = new Konva.Line({
+          points: [0, 0, hx, hy],
+          stroke: 'rgba(250, 204, 21, 0.6)',
           strokeWidth: 1,
+          dash: [3, 3],
           listening: false,
-        })
-      );
+        });
+        group.add(guideLine);
+
+        const handleGroup = new Konva.Group({
+          x: hx,
+          y: hy,
+          listening: true,
+        });
+
+        const handleCircle = new Konva.Circle({
+          radius: 7,
+          fill: '#ffffff',
+          stroke: '#eab308',
+          strokeWidth: 2,
+          shadowColor: 'rgba(0, 0, 0, 0.35)',
+          shadowBlur: 3,
+          shadowOffset: { x: 0, y: 1 },
+        });
+
+        const handlePip = new Konva.Circle({
+          radius: 2.5,
+          fill: '#d97706',
+          listening: false,
+        });
+
+        handleGroup.add(handleCircle);
+        handleGroup.add(handlePip);
+        group.add(handleGroup);
+
+        const angleBadge = new Konva.Label({
+          x: hx + 10,
+          y: hy - 12,
+          visible: false,
+          listening: false,
+        });
+        angleBadge.add(
+          new Konva.Tag({
+            fill: 'rgba(17, 24, 39, 0.88)',
+            stroke: '#fbbf24',
+            strokeWidth: 1,
+            cornerRadius: 4,
+            pointerDirection: 'none',
+          })
+        );
+        const angleText = new Konva.Text({
+          text: `${facing}°`,
+          fontSize: 11,
+          fontFamily: 'sans-serif',
+          fontStyle: 'bold',
+          fill: '#fef08a',
+          padding: 3,
+        });
+        angleBadge.add(angleText);
+        group.add(angleBadge);
+
+        const startVisionRotation = (evt: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
+          evt.cancelBubble = true;
+          const stage = group.getStage();
+          if (!stage) return;
+
+          cb.setStageCursor('crosshair');
+          let currentFacing = facing;
+
+          const moveHandler = (moveEvt: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
+            const stagePos = stage.getPointerPosition();
+            if (!stagePos) return;
+
+            const transform = group.getAbsoluteTransform().copy().invert();
+            const localPos = transform.point(stagePos);
+
+            let deg = Math.round((Math.atan2(localPos.y, localPos.x) * 180) / Math.PI);
+            if (deg < 0) deg += 360;
+
+            if (moveEvt.evt && (moveEvt.evt as MouseEvent).shiftKey) {
+              deg = Math.round(deg / 15) * 15;
+              if (deg >= 360) deg = 0;
+            }
+
+            currentFacing = deg;
+
+            wedge.rotation(deg - 32);
+            const curRad = (deg * Math.PI) / 180;
+            const curHx = Math.cos(curRad) * handleRadius;
+            const curHy = Math.sin(curRad) * handleRadius;
+
+            handleGroup.position({ x: curHx, y: curHy });
+            guideLine.points([0, 0, curHx, curHy]);
+
+            angleText.text(`${deg}°`);
+            angleBadge.position({ x: curHx + 10, y: curHy - 12 });
+            angleBadge.visible(true);
+
+            entityLayer.batchDraw();
+          };
+
+          const upHandler = () => {
+            stage.off('pointermove.rotateVision touchmove.rotateVision');
+            stage.off('pointerup.rotateVision touchend.rotateVision');
+            cb.setStageCursor(cb.defaultToolCursor());
+
+            angleBadge.visible(false);
+            entityLayer.batchDraw();
+
+            if (currentFacing !== facing) {
+              cb.onUpdateEntityMeta?.(entity.id, { facing: currentFacing });
+            }
+          };
+
+          stage.on('pointermove.rotateVision touchmove.rotateVision', moveHandler);
+          stage.on('pointerup.rotateVision touchend.rotateVision', upHandler);
+        };
+
+        handleGroup.on('pointerenter', () => cb.setStageCursor('crosshair'));
+        handleGroup.on('pointerleave', () => cb.setStageCursor(cb.defaultToolCursor()));
+        handleGroup.on('pointerdown mousedown touchstart', startVisionRotation);
+
+        wedge.on('pointerenter', () => cb.setStageCursor('crosshair'));
+        wedge.on('pointerleave', () => cb.setStageCursor(cb.defaultToolCursor()));
+        wedge.on('pointerdown mousedown touchstart', startVisionRotation);
+      } else if (canInteract && !isSelected) {
+        wedge.on('pointerenter', () => cb.setStageCursor('pointer'));
+        wedge.on('pointerleave', () => cb.setStageCursor(cb.defaultToolCursor()));
+        wedge.on('click tap', (e) => {
+          e.cancelBubble = true;
+          cb.onSelectEntity(entity.id);
+        });
+      }
     }
 
     if (isBall) {
