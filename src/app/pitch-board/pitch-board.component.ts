@@ -124,7 +124,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
   showMobileTools = signal(true);
   briefingMode = signal(false);
   mobileSection = signal<'tools' | 'settings' | 'equipment' | 'timeline' | 'none'>('tools');
-  mobileCategory = signal<'move' | 'arrows' | 'shapes' | 'grid' | 'bench'>('move');
+  mobileCategory = signal<'move' | 'arrows' | 'shapes' | 'grid' | 'equipment' | 'bench'>('move');
   activeTool = signal<ActiveToolMode>('move');
   isDrawingMode = computed(() => this.activeTool() !== 'move');
   arrowStyle = signal<ArrowStyle>('pass');
@@ -727,7 +727,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  setMobileCategory(cat: 'move' | 'arrows' | 'shapes' | 'grid' | 'bench') {
+  setMobileCategory(cat: 'move' | 'arrows' | 'shapes' | 'grid' | 'equipment' | 'bench') {
     this.mobileCategory.set(cat);
     if (cat === 'move') {
       this.activeTool.set('move');
@@ -748,7 +748,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
         this.divisionsConfig.update((c) => ({ ...c, grid: 'thirds-channels' }));
         this.refreshDivisionsLayer();
       }
-    } else if (cat === 'bench') {
+    } else if (cat === 'equipment' || cat === 'bench') {
       this.showEquipmentTray.set(true);
       this.showDivisionsPanel.set(false);
     }

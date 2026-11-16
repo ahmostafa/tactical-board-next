@@ -560,9 +560,14 @@
                 [class.dark:text-slate-100]="!showEquipmentTray()"
                 [class.hover:bg-slate-200]="!showEquipmentTray()"
                 [class.dark:hover:bg-gray-700]="!showEquipmentTray()"
-                title="Equipment & Bench Palette">
-          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l6 14H6z M4 21h16"/></svg>
-          <span class="hidden lg:inline">Bench</span>
+                title="Drill Equipment & Squad Roster (Cones, Goals, Mannequins, Players)">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m8 21 3.2-15.5a1 1 0 0 1 1.6 0L16 21"/>
+            <path d="M2 21h20"/>
+            <path d="M7 16h10"/>
+            <path d="M9 11h6"/>
+          </svg>
+          <span class="hidden lg:inline">Equipment</span>
         </button>
       </div>
 
@@ -660,14 +665,20 @@
           <span>Grid</span>
         </button>
 
-        <button (click)="setMobileCategory('bench')"
+        <button (click)="setMobileCategory('equipment')"
                 class="flex-1 py-1 px-1 rounded-lg transition-all flex items-center justify-center gap-1 min-h-[36px]"
-                [class.bg-amber-600]="mobileCategory() === 'bench'"
-                [class.text-white]="mobileCategory() === 'bench'"
-                [class.text-slate-700]="mobileCategory() !== 'bench'"
-                [class.dark:text-slate-200]="mobileCategory() !== 'bench'">
-          <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l6 14H6z M4 21h16"/></svg>
-          <span>Bench</span>
+                [class.bg-amber-600]="mobileCategory() === 'equipment' || mobileCategory() === 'bench'"
+                [class.text-white]="mobileCategory() === 'equipment' || mobileCategory() === 'bench'"
+                [class.text-slate-700]="mobileCategory() !== 'equipment' && mobileCategory() !== 'bench'"
+                [class.dark:text-slate-200]="mobileCategory() !== 'equipment' && mobileCategory() !== 'bench'">
+          <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m8 21 3.2-15.5a1 1 0 0 1 1.6 0L16 21"/>
+            <path d="M2 21h20"/>
+            <path d="M7 16h10"/>
+            <path d="M9 11h6"/>
+          </svg>
+          <span class="hidden sm:inline">Equipment</span>
+          <span class="sm:hidden">Equip</span>
         </button>
 
         <div class="flex items-center pl-0.5 border-l border-[var(--tb-border-subtle)] shrink-0">

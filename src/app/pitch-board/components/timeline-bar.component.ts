@@ -10,30 +10,37 @@ import { ChangeDetectionStrategy, Component, computed, input, output } from '@an
       <div class="flex flex-wrap items-center justify-between gap-2.5">
         <!-- Play / Stop & Step Group -->
         <div class="flex items-center gap-1.5 shrink-0">
-          <button (click)="isPlaying() ? stop.emit() : play.emit()"
-                  [disabled]="isExporting() || (!isPlaying() && frameCount() < 2)"
-                  class="px-4 py-2 min-h-[40px] font-bold rounded-md shadow-sm disabled:opacity-40 transition-all flex items-center gap-2"
-                  [class.bg-emerald-600]="!isPlaying()"
-                  [class.text-white]="!isPlaying()"
-                  [class.hover:bg-emerald-500]="!isPlaying()"
+          <button (click)="play.emit()"
+                  [disabled]="isPlaying() || isExporting() || frameCount() < 2"
+                  class="px-3.5 py-2 min-h-[40px] font-bold rounded-lg shadow-sm disabled:opacity-40 transition-all flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white"
+                  title="Play full tactical animation across all frames">
+            <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            <span>Play</span>
+          </button>
+
+          <button (click)="stop.emit()"
+                  [disabled]="!isPlaying() || isExporting()"
+                  class="px-3.5 py-2 min-h-[40px] font-bold rounded-lg shadow-sm transition-all flex items-center gap-1.5"
                   [class.bg-rose-600]="isPlaying()"
+                  [class.hover:bg-rose-500]="isPlaying()"
                   [class.text-white]="isPlaying()"
-                  [class.hover:bg-rose-500]="isPlaying()">
-            @if (isPlaying()) {
-              <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
-              <span>Stop</span>
-            } @else {
-              <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-              <span>Play</span>
-            }
+                  [class.shadow-md]="isPlaying()"
+                  [class.bg-[var(--tb-button-bg)]]="!isPlaying()"
+                  [class.text-[var(--tb-button-text)]]="!isPlaying()"
+                  [class.border]="!isPlaying()"
+                  [class.border-[var(--tb-border)]]="!isPlaying()"
+                  [class.disabled:opacity-35]="!isPlaying()"
+                  title="Stop animation playback">
+            <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+            <span>Stop</span>
           </button>
 
           <button (click)="playStep.emit()"
                   [disabled]="isPlaying() || isExporting() || frameCount() < 2"
-                  class="px-3 py-2 min-h-[40px] bg-indigo-600 hover:bg-indigo-500 text-white rounded-md text-xs font-bold disabled:opacity-40 transition-colors shadow-sm flex items-center gap-1.5"
+                  class="px-2.5 sm:px-3 py-2 min-h-[40px] bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold disabled:opacity-40 transition-colors shadow-sm flex items-center gap-1"
                   title="Preview only the current step transition">
-            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
-            <span class="hidden sm:inline">Play Step</span>
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            <span>Step</span>
           </button>
         </div>
 
