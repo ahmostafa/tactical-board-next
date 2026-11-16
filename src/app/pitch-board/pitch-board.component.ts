@@ -82,6 +82,7 @@ import { CollectionsDrawerComponent } from './components/collections-drawer.comp
 import { TimelineBarComponent } from './components/timeline-bar.component';
 import { AboutModalComponent } from './components/about-modal.component';
 import { APP_VERSION } from '../../environments/version';
+import { ThemeService } from '../core/theme.service';
 
 export { TEAM_COLOR_PRESETS, DRAWING_COLORS, CURSORS, BOARD_ZOOM_LEVELS };
 export type { PitchViewMode, ActiveToolMode };
@@ -106,6 +107,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
   private ngZone = inject(NgZone);
   private exportService = inject(BoardExportService);
   protected store = inject(BoardStore);
+  protected themeService = inject(ThemeService);
 
   protected readonly formations = FORMATION_NAMES;
   protected readonly squadPresets = SQUAD_PRESET_OPTIONS;
@@ -117,6 +119,10 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
 
   // UI Signals
   showAbout = signal(false);
+  showMoreMenu = signal(false);
+  showPitchSettings = signal(false);
+  showMobileTools = signal(true);
+  briefingMode = signal(false);
   activeTool = signal<ActiveToolMode>('move');
   isDrawingMode = computed(() => this.activeTool() !== 'move');
   arrowStyle = signal<ArrowStyle>('pass');
@@ -389,6 +395,10 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
       if (event.key === 'Escape') {
         if (this.showAbout()) {
           this.showAbout.set(false);
+          return;
+        }
+        if (this.showMoreMenu()) {
+          this.showMoreMenu.set(false);
           return;
         }
         this.activeTool.set('move');
@@ -681,6 +691,26 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
   // ---- Interactive Feature Tour, About & Built-in Demos ----
   toggleAbout() {
     this.showAbout.set(!this.showAbout());
+  }
+
+  toggleMoreMenu() {
+    this.showMoreMenu.update((v) => !v);
+  }
+
+  closeMoreMenu() {
+    this.showMoreMenu.set(false);
+  }
+
+  toggleTheme() {
+    this.themeService.toggleTheme();
+  }
+
+  toggleBriefingMode() {
+    this.briefingMode.update((v) => !v);
+  }
+
+  togglePitchSettings() {
+    this.showPitchSettings.update((v) => !v);
   }
 
   toggleTour() {

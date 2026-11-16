@@ -6,15 +6,15 @@ import { SavedCollectionItem } from '../models/tactical-board.models';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="mb-3 p-3 rounded bg-gray-800 border border-teal-600/60 text-xs flex flex-col gap-2">
+    <div class="mb-3 p-3.5 rounded-lg bg-[var(--tb-bg-surface)] text-[var(--tb-text-primary)] border border-teal-600/50 shadow-md text-xs flex flex-col gap-2.5 transition-colors">
       <div class="flex flex-wrap items-center gap-2">
-        <span class="font-bold text-teal-300 text-sm">Tactical Collections Library</span>
+        <span class="font-extrabold text-teal-600 dark:text-teal-400 text-sm">Tactical Collections Library</span>
         <input type="text" placeholder="Scheme title (e.g. Arsenal High Press 4-3-3)..."
-               class="bg-gray-900 text-white px-2.5 py-1 rounded border border-gray-600 w-64"
+               class="bg-[var(--tb-bg-surface-elevated)] text-[var(--tb-text-primary)] px-3 py-1.5 rounded-md border border-[var(--tb-border)] w-64 min-h-[36px]"
                [value]="title()"
                (input)="titleChange.emit($any($event.target).value)" />
         <select aria-label="Scheme category"
-                class="bg-gray-700 text-white rounded px-2 py-1"
+                class="bg-[var(--tb-bg-surface-elevated)] text-[var(--tb-text-primary)] rounded-md px-2.5 py-1.5 border border-[var(--tb-border)] min-h-[36px] font-semibold"
                 [value]="category()"
                 (change)="categoryChange.emit($any($event.target).value)">
           <option value="Match Tactic">Match Tactic</option>
@@ -22,35 +22,35 @@ import { SavedCollectionItem } from '../models/tactical-board.models';
           <option value="Training Drill">Training Drill</option>
         </select>
         <button type="button" (click)="saveCurrent.emit()"
-                class="px-3 py-1 bg-teal-600 hover:bg-teal-500 font-bold rounded">
+                class="px-3 py-1.5 min-h-[36px] bg-teal-600 hover:bg-teal-500 text-white font-bold rounded-md shadow-sm transition-colors">
           + Save to Collection
         </button>
         <button type="button" (click)="exportJson.emit()"
-                class="px-2.5 py-1 bg-gray-700 hover:bg-gray-600 font-semibold rounded">
+                class="px-2.5 py-1.5 min-h-[36px] bg-[var(--tb-button-bg)] hover:bg-[var(--tb-button-hover)] text-[var(--tb-button-text)] border border-[var(--tb-border)] font-semibold rounded-md transition-colors">
           Export .JSON
         </button>
-        <label class="px-2.5 py-1 bg-gray-700 hover:bg-gray-600 font-semibold rounded cursor-pointer">
+        <label class="px-2.5 py-1.5 min-h-[36px] bg-[var(--tb-button-bg)] hover:bg-[var(--tb-button-hover)] text-[var(--tb-button-text)] border border-[var(--tb-border)] font-semibold rounded-md cursor-pointer transition-colors inline-flex items-center">
           Import .JSON
           <input type="file" accept=".json,application/json" class="hidden" (change)="importJson.emit($event)" />
         </label>
         <button type="button" (click)="closeDrawer.emit()"
-                class="ml-auto px-2 py-1 bg-gray-700 rounded">Close</button>
+                class="ml-auto px-3 py-1.5 min-h-[36px] bg-[var(--tb-button-bg)] hover:bg-[var(--tb-button-hover)] text-[var(--tb-button-text)] border border-[var(--tb-border)] rounded-md transition-colors font-medium">Close</button>
       </div>
       @if (collections().length === 0) {
-        <p class="text-gray-400">No schemes saved in your collection yet. Enter a title above and click "+ Save to Collection".</p>
+        <p class="text-[var(--tb-text-secondary)] italic">No schemes saved in your collection yet. Enter a title above and click "+ Save to Collection".</p>
       } @else {
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-44 overflow-y-auto pt-1">
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 max-h-48 overflow-y-auto pt-1">
           @for (item of collections(); track item.id) {
-            <div class="flex items-center justify-between gap-2 p-2 rounded bg-gray-900/90 border border-gray-700">
+            <div class="flex items-center justify-between gap-2 p-2.5 rounded-lg bg-[var(--tb-bg-surface-elevated)] border border-[var(--tb-border)] shadow-sm">
               <div class="min-w-0">
-                <div class="font-bold text-white truncate">{{ item.title }}</div>
-                <div class="text-[11px] text-gray-400">{{ item.category }} • {{ item.frameCount }} frame(s)</div>
+                <div class="font-bold text-[var(--tb-text-primary)] truncate">{{ item.title }}</div>
+                <div class="text-[11px] text-[var(--tb-text-secondary)]">{{ item.category }} • {{ item.frameCount }} frame(s)</div>
               </div>
-              <div class="flex items-center gap-1 shrink-0">
+              <div class="flex items-center gap-1.5 shrink-0">
                 <button type="button" (click)="loadItem.emit(item)"
-                        class="px-2 py-1 bg-emerald-700 hover:bg-emerald-600 rounded font-bold">Load</button>
+                        class="px-2.5 py-1 min-h-[32px] bg-emerald-700 hover:bg-emerald-600 text-white rounded-md font-bold shadow-sm">Load</button>
                 <button type="button" (click)="removeItem.emit(item.id)"
-                        class="px-2 py-1 bg-rose-800 hover:bg-rose-700 rounded">✕</button>
+                        class="px-2.5 py-1 min-h-[32px] bg-rose-700 hover:bg-rose-600 text-white rounded-md font-bold shadow-sm">✕</button>
               </div>
             </div>
           }

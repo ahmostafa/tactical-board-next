@@ -19,7 +19,7 @@ const VALID_BOARD_PATHS = new Set([
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [PitchBoardComponent, NotFoundComponent, ServerErrorBannerComponent],
   template: `
-    <main class="min-h-screen bg-gray-900 flex items-start justify-center py-2">
+    <main class="min-h-screen bg-[var(--tb-bg-app)] text-[var(--tb-text-primary)] transition-colors duration-200 flex items-start justify-center py-1 sm:py-2 px-1 sm:px-2">
       @if (errorService.hasError()) {
         <app-server-error-banner
           [code]="errorService.errorCode()"

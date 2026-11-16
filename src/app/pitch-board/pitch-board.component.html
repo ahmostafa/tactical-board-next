@@ -1,140 +1,161 @@
-<div class="w-full mx-auto p-3 text-white overflow-x-auto"
+<div class="w-full mx-auto p-2 sm:p-3 text-[var(--tb-text-primary)] transition-colors duration-200 overflow-x-hidden"
      [class.max-w-6xl]="boardZoom() <= 1"
      [class.max-w-full]="boardZoom() > 1">
-  <!-- Row 1: Primary Drawing, Arrow Styles, Overlays, History & File Controls -->
-  <fieldset class="flex flex-wrap items-center gap-2 mb-2 border-0 p-0 m-0 min-w-0" [disabled]="isPlaying() || isExporting()">
-    <button (click)="toggleDrawingMode()"
-            class="px-3 py-1.5 text-sm text-white font-bold rounded shadow-md transition-colors"
-            [class.bg-blue-600]="!isDrawingMode()"
-            [class.bg-red-600]="isDrawingMode()">
-      {{ isDrawingMode() ? 'Stop Drawing (Back to Dragging)' : 'Draw Tactical Arrows' }}
-    </button>
 
-    <!-- Line & Arrow Styles -->
-    <div class="inline-flex rounded shadow-md overflow-hidden" role="group" aria-label="Arrow style">
-      <button (click)="selectArrowStyle('pass')"
-              class="px-2.5 py-1.5 text-xs font-bold text-white transition-colors"
-              [class.bg-amber-600]="activeTool() === 'arrow' && arrowStyle() === 'pass'"
-              [class.bg-gray-700]="!(activeTool() === 'arrow' && arrowStyle() === 'pass')"
-              title="Solid arrow for passes">Pass</button>
-      <button (click)="selectArrowStyle('run')"
-              class="px-2.5 py-1.5 text-xs font-bold text-white border-l border-gray-600 transition-colors"
-              [class.bg-amber-600]="activeTool() === 'arrow' && arrowStyle() === 'run'"
-              [class.bg-gray-700]="!(activeTool() === 'arrow' && arrowStyle() === 'run')"
-              title="Dashed arrow for off-the-ball runs">Run</button>
-      <button (click)="selectArrowStyle('dribble')"
-              class="px-2.5 py-1.5 text-xs font-bold text-white border-l border-gray-600 transition-colors"
-              [class.bg-amber-600]="activeTool() === 'arrow' && arrowStyle() === 'dribble'"
-              [class.bg-gray-700]="!(activeTool() === 'arrow' && arrowStyle() === 'dribble')"
-              title="Wavy arrow for ball carrier dribbles">Dribble</button>
-      <button (click)="selectArrowStyle('zone')"
-              class="px-2.5 py-1.5 text-xs font-bold text-white border-l border-gray-600 transition-colors"
-              [class.bg-amber-600]="activeTool() === 'arrow' && arrowStyle() === 'zone'"
-              [class.bg-gray-700]="!(activeTool() === 'arrow' && arrowStyle() === 'zone')"
-              title="Arrow pointing into a highlighted empty space / target zone">Target Zone</button>
-      <button (click)="selectArrowStyle('block')"
-              class="px-2.5 py-1.5 text-xs font-bold text-white border-l border-gray-600 transition-colors"
-              [class.bg-amber-600]="activeTool() === 'arrow' && arrowStyle() === 'block'"
-              [class.bg-gray-700]="!(activeTool() === 'arrow' && arrowStyle() === 'block')"
-              title="Defensive block / screen line with perpendicular T-bar cap">Block ┬</button>
-      <button (click)="selectArrowStyle('freehand')"
-              class="px-2.5 py-1.5 text-xs font-bold text-white border-l border-gray-600 transition-colors"
-              [class.bg-amber-600]="activeTool() === 'arrow' && arrowStyle() === 'freehand'"
-              [class.bg-gray-700]="!(activeTool() === 'arrow' && arrowStyle() === 'freehand')"
-              title="Freehand pencil sketch">Freehand</button>
+  <!-- Top App Navigation & Global Actions Bar -->
+  <header class="flex flex-wrap items-center justify-between gap-2 mb-2 px-3 py-2 rounded-lg bg-[var(--tb-bg-surface)] border border-[var(--tb-border)] shadow-sm">
+    <!-- Brand Title, Version & About Trigger -->
+    <div class="flex items-center gap-2">
+      <span class="w-7 h-7 rounded-md bg-emerald-600 text-white flex items-center justify-center font-black text-sm shadow-sm select-none" aria-hidden="true">
+        ⚽
+      </span>
+      <div class="flex items-baseline gap-1.5">
+        <span class="font-extrabold text-sm sm:text-base tracking-tight text-slate-900 dark:text-white">
+          Tactical Board
+        </span>
+        <span class="text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
+          Next
+        </span>
+      </div>
+      <button (click)="toggleAbout()"
+              data-testid="about-button"
+              class="px-2 py-0.5 text-xs font-semibold rounded-md border border-slate-300 dark:border-gray-700 bg-slate-100 dark:bg-gray-800 hover:bg-slate-200 dark:hover:bg-gray-700 text-slate-800 dark:text-slate-100 transition-colors shadow-sm"
+              title="About Tactical Board Next & Version Info">
+        ℹ {{ appVersion }}
+      </button>
     </div>
 
-    <!-- Shapes, Text & Eraser -->
-    <div class="inline-flex rounded shadow-md overflow-hidden" role="group" aria-label="Shapes and annotation tools">
-      <button (click)="selectShapeTool('rect')"
-              class="px-2.5 py-1.5 text-xs font-bold text-white transition-colors"
-              [class.bg-indigo-600]="activeTool() === 'shape' && shapeKind() === 'rect'"
-              [class.bg-gray-700]="!(activeTool() === 'shape' && shapeKind() === 'rect')"
-              title="Draw rectangular tactical zone">Rect Zone</button>
-      <button (click)="selectShapeTool('ellipse')"
-              class="px-2.5 py-1.5 text-xs font-bold text-white border-l border-gray-600 transition-colors"
-              [class.bg-indigo-600]="activeTool() === 'shape' && shapeKind() === 'ellipse'"
-              [class.bg-gray-700]="!(activeTool() === 'shape' && shapeKind() === 'ellipse')"
-              title="Draw circular/elliptical pressing zone">Circle Zone</button>
-      <button (click)="selectShapeTool('triangle')"
-              class="px-2.5 py-1.5 text-xs font-bold text-white border-l border-gray-600 transition-colors"
-              [class.bg-indigo-600]="activeTool() === 'shape' && shapeKind() === 'triangle'"
-              [class.bg-gray-700]="!(activeTool() === 'shape' && shapeKind() === 'triangle')"
-              title="Draw triangular pressing trap / cover shadow">Triangle</button>
-      <button (click)="selectTextTool()"
-              class="px-2.5 py-1.5 text-xs font-bold text-white border-l border-gray-600 transition-colors"
-              [class.bg-indigo-600]="activeTool() === 'text'"
-              [class.bg-gray-700]="activeTool() !== 'text'"
-              title="Click on pitch to place a draggable text label">Text</button>
-      <button (click)="selectEraserTool()"
-              class="px-2.5 py-1.5 text-xs font-bold text-white border-l border-gray-600 transition-colors"
-              [class.bg-rose-600]="activeTool() === 'eraser'"
-              [class.bg-gray-700]="activeTool() !== 'eraser'"
-              title="Click any arrow, zone, text, or equipment item to delete it">Eraser</button>
-    </div>
-
-    <button (click)="toggleDivisions()"
-            class="px-3 py-1.5 text-xs text-white font-bold rounded shadow-md transition-colors"
-            [class.bg-gray-700]="!showDivisions() && !showDivisionsPanel()"
-            [class.bg-emerald-600]="showDivisions() || showDivisionsPanel()"
-            title="Show/hide pitch grids (Thirds & 5 Channels, 18-Zone, 20-Zone) and specialized sub-zones (Zone 14, Golden Zone, Pockets, Cutbacks)">
-      Pitch Divisions
-      @if (activeSubZoneCount() > 0) {
-        <span class="ml-1 px-1 py-0.2 rounded bg-amber-400 text-gray-950 text-[10px]">+{{ activeSubZoneCount() }}</span>
-      }
-    </button>
-
-    <button (click)="store.undo()" [disabled]="!store.canUndo()"
-            class="px-3 py-1.5 text-xs bg-gray-700 text-white font-bold rounded shadow-md disabled:opacity-40">Undo</button>
-    <button (click)="store.redo()" [disabled]="!store.canRedo()"
-            class="px-3 py-1.5 text-xs bg-gray-700 text-white font-bold rounded shadow-md disabled:opacity-40">Redo</button>
-    <button (click)="store.clearArrows()" [disabled]="!store.hasArrows()"
-            class="px-3 py-1.5 text-xs bg-gray-700 text-white font-bold rounded shadow-md disabled:opacity-40">Clear Arrows</button>
-    <button (click)="saveBoard()"
-            class="px-3 py-1.5 text-xs bg-emerald-700 text-white font-bold rounded shadow-md">Save</button>
-    <button (click)="loadBoard()" [disabled]="!hasSavedBoard()"
-            class="px-3 py-1.5 text-xs bg-emerald-700 text-white font-bold rounded shadow-md disabled:opacity-40">Load</button>
-    <button (click)="showCollections.set(!showCollections())"
-            class="px-3 py-1.5 text-xs font-bold rounded shadow-md transition-colors"
-            [class.bg-teal-600]="showCollections()"
-            [class.bg-gray-700]="!showCollections()"
-            title="Open multi-board Collections library and JSON import/export">
-      Collections ({{ collections().length }})
-    </button>
-    <button (click)="shareSchemeLink()"
-            class="px-3 py-1.5 text-xs bg-sky-700 hover:bg-sky-600 text-white font-bold rounded shadow-md"
-            title="Copy a shareable link encoding the entire board and animation">Share Link</button>
-    <button (click)="showDemos.set(!showDemos())"
-            class="px-3 py-1.5 text-xs font-bold rounded shadow-md transition-colors"
-            [class.bg-purple-600]="showDemos()"
-            [class.bg-purple-800]="!showDemos()"
-            title="Load pre-built animated tactical demos and drills">
-      Demos (3)
-    </button>
-    <button (click)="toggleTour()"
-            class="px-2.5 py-1.5 text-xs font-bold rounded shadow-md transition-colors"
-            [class.bg-amber-500]="showTour()"
-            [class.text-gray-950]="showTour()"
-            [class.bg-gray-700]="!showTour()"
-            title="Interactive step-by-step guide to all features">
-      ? Tour
-    </button>
-    <button (click)="toggleAbout()"
-            data-testid="about-button"
-            class="px-2.5 py-1.5 text-xs font-bold rounded shadow-md transition-colors"
-            [class.bg-emerald-500]="showAbout()"
-            [class.text-gray-950]="showAbout()"
-            [class.bg-gray-700]="!showAbout()"
-            [class.text-white]="!showAbout()"
-            title="About Tactical Board Next & Version Info">
-      ℹ About ({{ appVersion }})
-    </button>
-    <button (click)="resetBoard()"
-            class="px-3 py-1.5 text-xs bg-gray-700 text-white font-bold rounded shadow-md">Reset</button>
+    <!-- Status Message Indicator -->
     @if (statusMessage()) {
-      <span class="self-center text-xs text-amber-300 font-semibold">{{ statusMessage() }}</span>
+      <div class="px-2.5 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-800 dark:text-amber-300 text-xs font-semibold animate-pulse">
+        {{ statusMessage() }}
+      </div>
     }
-  </fieldset>
+
+    <!-- Quick Action Controls & Menus -->
+    <div class="flex items-center gap-1.5 ml-auto">
+      <!-- Collections Library Button -->
+      <button (click)="showCollections.set(!showCollections())"
+              class="px-3 py-1.5 min-h-[38px] text-xs font-bold rounded-md border transition-all flex items-center gap-1.5 shadow-sm"
+              [class.bg-teal-600]="showCollections()"
+              [class.text-white]="showCollections()"
+              [class.border-teal-500]="showCollections()"
+              [class.bg-slate-100]="!showCollections()"
+              [class.dark:bg-gray-800]="!showCollections()"
+              [class.text-slate-800]="!showCollections()"
+              [class.dark:text-slate-100]="!showCollections()"
+              [class.border-slate-300]="!showCollections()"
+              [class.dark:border-gray-700]="!showCollections()"
+              [class.hover:bg-slate-200]="!showCollections()"
+              [class.dark:hover:bg-gray-700]="!showCollections()"
+              title="Open multi-board Collections library and JSON import/export">
+        <span>📁</span>
+        <span>Collections ({{ collections().length }})</span>
+      </button>
+
+      <!-- Share Link Button -->
+      <button (click)="shareSchemeLink()"
+              class="px-3 py-1.5 min-h-[38px] text-xs font-bold rounded-md border border-sky-600/40 bg-sky-600 hover:bg-sky-500 text-white shadow-sm transition-colors flex items-center gap-1.5"
+              title="Copy a shareable link encoding the entire board and animation">
+        <span>🔗</span>
+        <span class="hidden sm:inline">Share Link</span>
+      </button>
+
+      <!-- Theme Switcher: Daylight Touchline vs Locker Room OLED -->
+      <button (click)="toggleTheme()"
+              class="px-2.5 py-1.5 min-h-[38px] text-xs font-semibold rounded-md border border-slate-300 dark:border-gray-700 bg-slate-100 dark:bg-gray-800 hover:bg-slate-200 dark:hover:bg-gray-700 text-slate-800 dark:text-slate-100 transition-colors flex items-center gap-1.5 shadow-sm"
+              [title]="themeService.isDark() ? 'Switch to Daylight Touchline Mode' : 'Switch to Locker Room OLED Mode'">
+        @if (themeService.isDark()) {
+          <span class="text-amber-400">☀️</span>
+          <span class="hidden md:inline">Daylight</span>
+        } @else {
+          <span class="text-indigo-600">🌙</span>
+          <span class="hidden md:inline">Locker Room</span>
+        }
+      </button>
+
+      <!-- Briefing / Zen Mode Toggle -->
+      <button (click)="toggleBriefingMode()"
+              class="px-2.5 py-1.5 min-h-[38px] text-xs font-semibold rounded-md border transition-colors flex items-center gap-1.5 shadow-sm"
+              [class.bg-purple-600]="briefingMode()"
+              [class.text-white]="briefingMode()"
+              [class.border-purple-500]="briefingMode()"
+              [class.bg-slate-100]="!briefingMode()"
+              [class.dark:bg-gray-800]="!briefingMode()"
+              [class.text-slate-800]="!briefingMode()"
+              [class.dark:text-slate-100]="!briefingMode()"
+              [class.border-slate-300]="!briefingMode()"
+              [class.dark:border-gray-700]="!briefingMode()"
+              [class.hover:bg-slate-200]="!briefingMode()"
+              [class.dark:hover:bg-gray-700]="!briefingMode()"
+              [title]="briefingMode() ? 'Exit Zen Briefing Mode (Show Toolbars)' : 'Zen Briefing Mode (Hide Toolbars for Team Talk)'">
+        <span>📽</span>
+        <span class="hidden lg:inline">{{ briefingMode() ? 'Exit Briefing' : 'Briefing' }}</span>
+      </button>
+
+      <!-- Match & Pitch Settings Toggle -->
+      <button (click)="togglePitchSettings()"
+              class="px-2.5 py-1.5 min-h-[38px] text-xs font-semibold rounded-md border transition-colors flex items-center gap-1.5 shadow-sm"
+              [class.bg-emerald-700]="showPitchSettings()"
+              [class.text-white]="showPitchSettings()"
+              [class.border-emerald-600]="showPitchSettings()"
+              [class.bg-slate-100]="!showPitchSettings()"
+              [class.dark:bg-gray-800]="!showPitchSettings()"
+              [class.text-slate-800]="!showPitchSettings()"
+              [class.dark:text-slate-100]="!showPitchSettings()"
+              [class.border-slate-300]="!showPitchSettings()"
+              [class.dark:border-gray-700]="!showPitchSettings()"
+              [class.hover:bg-slate-200]="!showPitchSettings()"
+              [class.dark:hover:bg-gray-700]="!showPitchSettings()"
+              title="Toggle Match & Pitch Configuration (Formations, Teams, Views, Zoom)">
+        <span>⚙️</span>
+        <span class="hidden sm:inline">Settings</span>
+      </button>
+
+      <!-- More Actions Dropdown -->
+      <div class="relative">
+        <button (click)="toggleMoreMenu()"
+                class="px-3 py-1.5 min-h-[38px] text-xs font-bold rounded-md border border-slate-300 dark:border-gray-700 bg-slate-100 dark:bg-gray-800 hover:bg-slate-200 dark:hover:bg-gray-700 text-slate-800 dark:text-slate-100 transition-colors flex items-center gap-1 shadow-sm"
+                title="More actions: Save, Load, Clear, Reset, Demos, Tour">
+          <span>⋮ Actions</span>
+        </button>
+        @if (showMoreMenu()) {
+          <div class="fixed inset-0 z-40" (click)="closeMoreMenu()"></div>
+          <div class="absolute right-0 mt-1 w-52 rounded-lg bg-[var(--tb-bg-surface)] border border-[var(--tb-border)] shadow-xl z-50 py-1.5 text-xs text-slate-900 dark:text-slate-100 flex flex-col gap-0.5 animate-in fade-in duration-100">
+            <button (click)="saveBoard(); closeMoreMenu()"
+                    class="w-full text-left px-3 py-2 hover:bg-slate-100 dark:hover:bg-gray-800 flex items-center gap-2">
+              <span>💾</span> <span class="font-bold">Save Board</span>
+            </button>
+            <button (click)="loadBoard(); closeMoreMenu()" [disabled]="!hasSavedBoard()"
+                    class="w-full text-left px-3 py-2 hover:bg-slate-100 dark:hover:bg-gray-800 flex items-center gap-2 disabled:opacity-40">
+              <span>📂</span> <span class="font-bold">Load Saved Board</span>
+            </button>
+            <button (click)="store.clearArrows(); closeMoreMenu()" [disabled]="!store.hasArrows()"
+                    class="w-full text-left px-3 py-2 hover:bg-slate-100 dark:hover:bg-gray-800 flex items-center gap-2 disabled:opacity-40">
+              <span>🧹</span> <span>Clear Arrows</span>
+            </button>
+            <button (click)="resetBoard(); closeMoreMenu()"
+                    class="w-full text-left px-3 py-2 hover:bg-slate-100 dark:hover:bg-gray-800 flex items-center gap-2 text-rose-600 dark:text-rose-400">
+              <span>🔄</span> <span>Reset Board</span>
+            </button>
+            <div class="my-1 border-t border-[var(--tb-border-subtle)]"></div>
+            <button (click)="showDemos.set(!showDemos()); closeMoreMenu()"
+                    class="w-full text-left px-3 py-2 hover:bg-slate-100 dark:hover:bg-gray-800 flex items-center gap-2">
+              <span>🎯</span> <span>Demos (3)</span>
+            </button>
+            <button (click)="toggleTour(); closeMoreMenu()"
+                    class="w-full text-left px-3 py-2 hover:bg-slate-100 dark:hover:bg-gray-800 flex items-center gap-2">
+              <span>❓</span> <span>? Tour</span>
+            </button>
+            <button (click)="toggleAbout(); closeMoreMenu()"
+                    class="w-full text-left px-3 py-2 hover:bg-slate-100 dark:hover:bg-gray-800 flex items-center gap-2">
+              <span>ℹ</span> <span>About</span>
+            </button>
+          </div>
+        }
+      </div>
+    </div>
+  </header>
 
   <!-- Interactive Tour & Built-In Demo Tactics Panel -->
   <app-tour-demos-panel
@@ -155,294 +176,544 @@
     <app-about-modal (closeModal)="showAbout.set(false)" />
   }
 
-  <!-- Row 2: Squad Mode, Formations, Team Colors, Pitch Views, Zoom, Drawing Palette & Equipment Toggle -->
-  <fieldset class="flex flex-wrap items-center gap-2.5 mb-2 px-3 py-2 rounded bg-gray-800/90 text-xs border-0 m-0 min-w-0" [disabled]="isPlaying() || isExporting()">
-    <!-- Squad Preset / Empty Pitch Mode -->
-    <div class="flex items-center gap-1.5">
-      <span class="font-bold text-amber-300">Mode:</span>
-      <select aria-label="Squad preset mode"
-              class="bg-gray-700 text-white rounded px-2 py-1 font-semibold border border-amber-500/40"
-              [value]="store.squadPreset()"
-              (change)="onSquadPresetChange($any($event.target).value)">
-        @for (sp of squadPresets; track sp.value) {
-          <option [value]="sp.value">{{ sp.label }}</option>
-        }
-      </select>
-    </div>
+  @if (!briefingMode()) {
+    <!-- Primary Tactical Drawing & Annotation Toolbar (Ribbon) -->
+    <fieldset class="flex flex-wrap items-center gap-2 mb-2 p-2 rounded-lg bg-[var(--tb-bg-surface)] border border-[var(--tb-border)] shadow-sm text-xs min-w-0 overflow-x-auto max-w-full" [disabled]="isPlaying() || isExporting()">
+      <!-- Drawing Mode Toggle -->
+      <button (click)="toggleDrawingMode()"
+              class="px-3.5 py-2 min-h-[42px] text-xs font-bold rounded-md shadow-sm transition-all flex items-center gap-2 shrink-0"
+              [class.bg-blue-600]="!isDrawingMode()"
+              [class.text-white]="!isDrawingMode()"
+              [class.hover:bg-blue-500]="!isDrawingMode()"
+              [class.bg-rose-600]="isDrawingMode()"
+              [class.text-white]="isDrawingMode()"
+              [class.hover:bg-rose-500]="isDrawingMode()">
+        <span class="w-2.5 h-2.5 rounded-full" [class.bg-blue-200]="!isDrawingMode()" [class.bg-white]="isDrawingMode()"></span>
+        {{ isDrawingMode() ? 'Stop Drawing (Back to Dragging)' : 'Draw Tactical Arrows' }}
+      </button>
 
-    <!-- Home Team Formation & Color -->
-    <div class="flex items-center gap-1.5">
-      <span class="inline-block w-3 h-3 rounded-full border border-white/60" [style.background]="store.homeColor()"></span>
-      <span class="font-bold text-gray-200">Home:</span>
-      <select aria-label="Home formation"
-              class="bg-gray-700 text-white rounded px-2 py-1 font-semibold"
-              [value]="store.homeFormation()"
-              (change)="onFormationChange('home', $any($event.target).value)">
-        @for (f of formations; track f) {
-          <option [value]="f">{{ f }}</option>
-        }
-      </select>
-      <input type="color" aria-label="Home team color"
-             class="w-6 h-6 rounded cursor-pointer bg-transparent border-0"
-             [value]="store.homeColor()"
-             (input)="onTeamColorChange('home', $any($event.target).value)" />
-    </div>
-
-    <!-- Away Team Formation & Color -->
-    <div class="flex items-center gap-1.5">
-      <span class="inline-block w-3 h-3 rounded-full border border-white/60" [style.background]="store.awayColor()"></span>
-      <span class="font-bold text-gray-200">Away:</span>
-      <select aria-label="Away formation"
-              class="bg-gray-700 text-white rounded px-2 py-1 font-semibold"
-              [value]="store.awayFormation()"
-              (change)="onFormationChange('away', $any($event.target).value)">
-        @for (f of formations; track f) {
-          <option [value]="f">{{ f }}</option>
-        }
-      </select>
-      <input type="color" aria-label="Away team color"
-             class="w-6 h-6 rounded cursor-pointer bg-transparent border-0"
-             [value]="store.awayColor()"
-             (input)="onTeamColorChange('away', $any($event.target).value)" />
-    </div>
-
-    <span class="text-gray-600">|</span>
-
-    <!-- Pitch View, Zoom (70% - 200%) & Turf Toggles -->
-    <div class="flex items-center gap-1.5">
-      <span class="font-bold text-gray-300">Pitch:</span>
-      <select aria-label="Pitch view"
-              class="bg-gray-700 text-white rounded px-2 py-1 font-semibold"
-              [value]="pitchView()"
-              (change)="setPitchView($any($event.target).value)">
-        <option value="full">Full Horizontal</option>
-        <option value="half-left">Half Pitch (Left)</option>
-        <option value="half-right">Half Pitch (Right)</option>
-        <option value="vertical">Full Vertical</option>
-      </select>
-
-      <div class="inline-flex items-center rounded bg-gray-700 overflow-hidden" role="group" aria-label="Board zoom controls">
-        <button type="button" (click)="stepBoardZoom(-1)"
-                class="px-1.5 py-1 hover:bg-gray-600 font-bold"
-                title="Zoom out" aria-label="Zoom out">−</button>
-        <select aria-label="Board zoom"
-                class="bg-gray-700 text-white px-1.5 py-1 font-semibold border-x border-gray-600"
-                title="Board zoom level (up to 200%)"
-                [value]="boardZoom()"
-                (change)="setBoardZoom(+$any($event.target).value)">
-          <option value="0.7">70%</option>
-          <option value="0.8">80%</option>
-          <option value="0.85">85%</option>
-          <option value="0.9">90%</option>
-          <option value="0.95">95%</option>
-          <option value="1">100%</option>
-          <option value="1.05">105%</option>
-          <option value="1.1">110%</option>
-          <option value="1.15">115%</option>
-          <option value="1.2">120%</option>
-          <option value="1.3">130%</option>
-          <option value="1.5">150%</option>
-          <option value="1.75">175%</option>
-          <option value="2">200%</option>
-        </select>
-        <button type="button" (click)="stepBoardZoom(1)"
-                class="px-1.5 py-1 hover:bg-gray-600 font-bold"
-                title="Zoom in" aria-label="Zoom in">+</button>
+      <!-- Line & Arrow Styles -->
+      <div class="inline-flex rounded-md shadow-sm overflow-hidden border border-slate-300 dark:border-gray-700 shrink-0" role="group" aria-label="Arrow style">
+        <button (click)="selectArrowStyle('pass')"
+                class="px-3 py-2 min-h-[42px] font-bold transition-colors"
+                [class.bg-amber-600]="activeTool() === 'arrow' && arrowStyle() === 'pass'"
+                [class.text-white]="activeTool() === 'arrow' && arrowStyle() === 'pass'"
+                [class.bg-slate-100]="!(activeTool() === 'arrow' && arrowStyle() === 'pass')"
+                [class.dark:bg-gray-800]="!(activeTool() === 'arrow' && arrowStyle() === 'pass')"
+                [class.text-slate-800]="!(activeTool() === 'arrow' && arrowStyle() === 'pass')"
+                [class.dark:text-slate-100]="!(activeTool() === 'arrow' && arrowStyle() === 'pass')"
+                [class.hover:bg-slate-200]="!(activeTool() === 'arrow' && arrowStyle() === 'pass')"
+                [class.dark:hover:bg-gray-700]="!(activeTool() === 'arrow' && arrowStyle() === 'pass')"
+                title="Solid arrow for passes">Pass</button>
+        <button (click)="selectArrowStyle('run')"
+                class="px-3 py-2 min-h-[42px] font-bold border-l border-slate-300 dark:border-gray-700 transition-colors"
+                [class.bg-amber-600]="activeTool() === 'arrow' && arrowStyle() === 'run'"
+                [class.text-white]="activeTool() === 'arrow' && arrowStyle() === 'run'"
+                [class.bg-slate-100]="!(activeTool() === 'arrow' && arrowStyle() === 'run')"
+                [class.dark:bg-gray-800]="!(activeTool() === 'arrow' && arrowStyle() === 'run')"
+                [class.text-slate-800]="!(activeTool() === 'arrow' && arrowStyle() === 'run')"
+                [class.dark:text-slate-100]="!(activeTool() === 'arrow' && arrowStyle() === 'run')"
+                [class.hover:bg-slate-200]="!(activeTool() === 'arrow' && arrowStyle() === 'run')"
+                [class.dark:hover:bg-gray-700]="!(activeTool() === 'arrow' && arrowStyle() === 'run')"
+                title="Dashed arrow for off-the-ball runs">Run</button>
+        <button (click)="selectArrowStyle('dribble')"
+                class="px-3 py-2 min-h-[42px] font-bold border-l border-slate-300 dark:border-gray-700 transition-colors"
+                [class.bg-amber-600]="activeTool() === 'arrow' && arrowStyle() === 'dribble'"
+                [class.text-white]="activeTool() === 'arrow' && arrowStyle() === 'dribble'"
+                [class.bg-slate-100]="!(activeTool() === 'arrow' && arrowStyle() === 'dribble')"
+                [class.dark:bg-gray-800]="!(activeTool() === 'arrow' && arrowStyle() === 'dribble')"
+                [class.text-slate-800]="!(activeTool() === 'arrow' && arrowStyle() === 'dribble')"
+                [class.dark:text-slate-100]="!(activeTool() === 'arrow' && arrowStyle() === 'dribble')"
+                [class.hover:bg-slate-200]="!(activeTool() === 'arrow' && arrowStyle() === 'dribble')"
+                [class.dark:hover:bg-gray-700]="!(activeTool() === 'arrow' && arrowStyle() === 'dribble')"
+                title="Wavy arrow for ball carrier dribbles">Dribble</button>
+        <button (click)="selectArrowStyle('zone')"
+                class="px-3 py-2 min-h-[42px] font-bold border-l border-slate-300 dark:border-gray-700 transition-colors"
+                [class.bg-amber-600]="activeTool() === 'arrow' && arrowStyle() === 'zone'"
+                [class.text-white]="activeTool() === 'arrow' && arrowStyle() === 'zone'"
+                [class.bg-slate-100]="!(activeTool() === 'arrow' && arrowStyle() === 'zone')"
+                [class.dark:bg-gray-800]="!(activeTool() === 'arrow' && arrowStyle() === 'zone')"
+                [class.text-slate-800]="!(activeTool() === 'arrow' && arrowStyle() === 'zone')"
+                [class.dark:text-slate-100]="!(activeTool() === 'arrow' && arrowStyle() === 'zone')"
+                [class.hover:bg-slate-200]="!(activeTool() === 'arrow' && arrowStyle() === 'zone')"
+                [class.dark:hover:bg-gray-700]="!(activeTool() === 'arrow' && arrowStyle() === 'zone')"
+                title="Arrow pointing into a highlighted empty space / target zone">Target Zone</button>
+        <button (click)="selectArrowStyle('block')"
+                class="px-3 py-2 min-h-[42px] font-bold border-l border-slate-300 dark:border-gray-700 transition-colors"
+                [class.bg-amber-600]="activeTool() === 'arrow' && arrowStyle() === 'block'"
+                [class.text-white]="activeTool() === 'arrow' && arrowStyle() === 'block'"
+                [class.bg-slate-100]="!(activeTool() === 'arrow' && arrowStyle() === 'block')"
+                [class.dark:bg-gray-800]="!(activeTool() === 'arrow' && arrowStyle() === 'block')"
+                [class.text-slate-800]="!(activeTool() === 'arrow' && arrowStyle() === 'block')"
+                [class.dark:text-slate-100]="!(activeTool() === 'arrow' && arrowStyle() === 'block')"
+                [class.hover:bg-slate-200]="!(activeTool() === 'arrow' && arrowStyle() === 'block')"
+                [class.dark:hover:bg-gray-700]="!(activeTool() === 'arrow' && arrowStyle() === 'block')"
+                title="Defensive block / screen line with perpendicular T-bar cap">Block ┬</button>
+        <button (click)="selectArrowStyle('freehand')"
+                class="px-3 py-2 min-h-[42px] font-bold border-l border-slate-300 dark:border-gray-700 transition-colors"
+                [class.bg-amber-600]="activeTool() === 'arrow' && arrowStyle() === 'freehand'"
+                [class.text-white]="activeTool() === 'arrow' && arrowStyle() === 'freehand'"
+                [class.bg-slate-100]="!(activeTool() === 'arrow' && arrowStyle() === 'freehand')"
+                [class.dark:bg-gray-800]="!(activeTool() === 'arrow' && arrowStyle() === 'freehand')"
+                [class.text-slate-800]="!(activeTool() === 'arrow' && arrowStyle() === 'freehand')"
+                [class.dark:text-slate-100]="!(activeTool() === 'arrow' && arrowStyle() === 'freehand')"
+                [class.hover:bg-slate-200]="!(activeTool() === 'arrow' && arrowStyle() === 'freehand')"
+                [class.dark:hover:bg-gray-700]="!(activeTool() === 'arrow' && arrowStyle() === 'freehand')"
+                title="Freehand pencil sketch">Freehand</button>
       </div>
 
-      <label class="inline-flex items-center gap-1 cursor-pointer ml-1">
-        <input type="checkbox" [checked]="showStripes()" (change)="toggleStripes()" />
-        Stripes
-      </label>
-      <label class="inline-flex items-center gap-1 cursor-pointer ml-1">
-        <input type="checkbox" [checked]="showMarkings()" (change)="toggleMarkings()" />
-        Lines
-      </label>
-      <select aria-label="Pitch division grid"
-              class="bg-gray-700 text-white rounded px-2 py-1 font-semibold ml-1 border border-emerald-500/40"
-              title="Primary pitch coordinate grid (mutually exclusive)"
-              [value]="divisionsConfig().grid"
-              (change)="setDivisionGrid($any($event.target).value)">
-        <option value="none">Grid: Off</option>
-        <option value="thirds">Grid: 3 Thirds Only</option>
-        <option value="channels">Grid: 5 Channels Only</option>
-        <option value="thirds-channels">Grid: Thirds &amp; 5 Channels</option>
-        <option value="zones-18">Grid: 18-Zone (1–18)</option>
-        <option value="zones-20">Grid: 20-Zone (Positional)</option>
-      </select>
-    </div>
+      <!-- Shapes, Text & Eraser -->
+      <div class="inline-flex rounded-md shadow-sm overflow-hidden border border-slate-300 dark:border-gray-700 shrink-0" role="group" aria-label="Shapes and annotation tools">
+        <button (click)="selectShapeTool('rect')"
+                class="px-3 py-2 min-h-[42px] font-bold transition-colors"
+                [class.bg-indigo-600]="activeTool() === 'shape' && shapeKind() === 'rect'"
+                [class.text-white]="activeTool() === 'shape' && shapeKind() === 'rect'"
+                [class.bg-slate-100]="!(activeTool() === 'shape' && shapeKind() === 'rect')"
+                [class.dark:bg-gray-800]="!(activeTool() === 'shape' && shapeKind() === 'rect')"
+                [class.text-slate-800]="!(activeTool() === 'shape' && shapeKind() === 'rect')"
+                [class.dark:text-slate-100]="!(activeTool() === 'shape' && shapeKind() === 'rect')"
+                [class.hover:bg-slate-200]="!(activeTool() === 'shape' && shapeKind() === 'rect')"
+                [class.dark:hover:bg-gray-700]="!(activeTool() === 'shape' && shapeKind() === 'rect')"
+                title="Draw rectangular tactical zone">Rect Zone</button>
+        <button (click)="selectShapeTool('ellipse')"
+                class="px-3 py-2 min-h-[42px] font-bold border-l border-slate-300 dark:border-gray-700 transition-colors"
+                [class.bg-indigo-600]="activeTool() === 'shape' && shapeKind() === 'ellipse'"
+                [class.text-white]="activeTool() === 'shape' && shapeKind() === 'ellipse'"
+                [class.bg-slate-100]="!(activeTool() === 'shape' && shapeKind() === 'ellipse')"
+                [class.dark:bg-gray-800]="!(activeTool() === 'shape' && shapeKind() === 'ellipse')"
+                [class.text-slate-800]="!(activeTool() === 'shape' && shapeKind() === 'ellipse')"
+                [class.dark:text-slate-100]="!(activeTool() === 'shape' && shapeKind() === 'ellipse')"
+                [class.hover:bg-slate-200]="!(activeTool() === 'shape' && shapeKind() === 'ellipse')"
+                [class.dark:hover:bg-gray-700]="!(activeTool() === 'shape' && shapeKind() === 'ellipse')"
+                title="Draw circular/elliptical pressing zone">Circle Zone</button>
+        <button (click)="selectShapeTool('triangle')"
+                class="px-3 py-2 min-h-[42px] font-bold border-l border-slate-300 dark:border-gray-700 transition-colors"
+                [class.bg-indigo-600]="activeTool() === 'shape' && shapeKind() === 'triangle'"
+                [class.text-white]="activeTool() === 'shape' && shapeKind() === 'triangle'"
+                [class.bg-slate-100]="!(activeTool() === 'shape' && shapeKind() === 'triangle')"
+                [class.dark:bg-gray-800]="!(activeTool() === 'shape' && shapeKind() === 'triangle')"
+                [class.text-slate-800]="!(activeTool() === 'shape' && shapeKind() === 'triangle')"
+                [class.dark:text-slate-100]="!(activeTool() === 'shape' && shapeKind() === 'triangle')"
+                [class.hover:bg-slate-200]="!(activeTool() === 'shape' && shapeKind() === 'triangle')"
+                [class.dark:hover:bg-gray-700]="!(activeTool() === 'shape' && shapeKind() === 'triangle')"
+                title="Draw triangular pressing trap / cover shadow">Triangle</button>
+        <button (click)="selectTextTool()"
+                class="px-3 py-2 min-h-[42px] font-bold border-l border-slate-300 dark:border-gray-700 transition-colors"
+                [class.bg-indigo-600]="activeTool() === 'text'"
+                [class.text-white]="activeTool() === 'text'"
+                [class.bg-slate-100]="activeTool() !== 'text'"
+                [class.dark:bg-gray-800]="activeTool() !== 'text'"
+                [class.text-slate-800]="activeTool() !== 'text'"
+                [class.dark:text-slate-100]="activeTool() !== 'text'"
+                [class.hover:bg-slate-200]="activeTool() !== 'text'"
+                [class.dark:hover:bg-gray-700]="activeTool() !== 'text'"
+                title="Click on pitch to place a draggable text label">Text</button>
+        <button (click)="selectEraserTool()"
+                class="px-3 py-2 min-h-[42px] font-bold border-l border-slate-300 dark:border-gray-700 transition-colors"
+                [class.bg-rose-600]="activeTool() === 'eraser'"
+                [class.text-white]="activeTool() === 'eraser'"
+                [class.bg-slate-100]="activeTool() !== 'eraser'"
+                [class.dark:bg-gray-800]="activeTool() !== 'eraser'"
+                [class.text-slate-800]="activeTool() !== 'eraser'"
+                [class.dark:text-slate-100]="activeTool() !== 'eraser'"
+                [class.hover:bg-slate-200]="activeTool() !== 'eraser'"
+                [class.dark:hover:bg-gray-700]="activeTool() !== 'eraser'"
+                title="Click any arrow, zone, text, or equipment item to delete it">Eraser</button>
+      </div>
 
-    <span class="text-gray-600">|</span>
+      <!-- Pitch Divisions Overlay Toggle -->
+      <button (click)="toggleDivisions()"
+              class="px-3 py-2 min-h-[42px] font-bold rounded-md border transition-colors shadow-sm flex items-center gap-1.5 shrink-0"
+              [class.bg-emerald-600]="showDivisions() || showDivisionsPanel()"
+              [class.text-white]="showDivisions() || showDivisionsPanel()"
+              [class.border-emerald-500]="showDivisions() || showDivisionsPanel()"
+              [class.bg-slate-100]="!showDivisions() && !showDivisionsPanel()"
+              [class.dark:bg-gray-800]="!showDivisions() && !showDivisionsPanel()"
+              [class.text-slate-800]="!showDivisions() && !showDivisionsPanel()"
+              [class.dark:text-slate-100]="!showDivisions() && !showDivisionsPanel()"
+              [class.border-slate-300]="!showDivisions() && !showDivisionsPanel()"
+              [class.dark:border-gray-700]="!showDivisions() && !showDivisionsPanel()"
+              [class.hover:bg-slate-200]="!showDivisions() && !showDivisionsPanel()"
+              [class.dark:hover:bg-gray-700]="!showDivisions() && !showDivisionsPanel()"
+              title="Show/hide pitch grids (Thirds, 5 Channels, 18-Zone, 20-Zone) and specialized sub-zones">
+        <span>📐</span>
+        <span>Pitch Divisions</span>
+        @if (activeSubZoneCount() > 0) {
+          <span class="px-1.5 py-0.5 rounded-full bg-amber-400 text-gray-950 font-extrabold text-[10px]">+{{ activeSubZoneCount() }}</span>
+        }
+      </button>
 
-    <!-- Drawing Color & Thickness -->
-    <div class="flex items-center gap-1.5">
-      <span class="font-bold text-gray-300">Ink:</span>
-      @for (c of drawingColors; track c.hex) {
-        <button type="button" (click)="drawColor.set(c.hex)"
-                class="w-4 h-4 rounded-full border transition-transform"
-                [style.background]="c.hex"
-                [class.scale-125]="drawColor() === c.hex"
-                [class.border-white]="drawColor() === c.hex"
-                [class.border-gray-600]="drawColor() !== c.hex"
-                [title]="c.name"></button>
-      }
-      <select aria-label="Stroke thickness"
-              class="bg-gray-700 text-white rounded px-1.5 py-0.5 ml-1"
-              [value]="drawWidth()"
-              (change)="drawWidth.set(+$any($event.target).value)">
-        <option [value]="2.5">Thin</option>
-        <option [value]="4">Med</option>
-        <option [value]="6.5">Thick</option>
-      </select>
-    </div>
+      <!-- Equipment Tray Toggle -->
+      <button type="button" (click)="showEquipmentTray.set(!showEquipmentTray())"
+              class="px-3 py-2 min-h-[42px] font-bold rounded-md border transition-colors shadow-sm flex items-center gap-1.5 shrink-0"
+              [class.bg-amber-600]="showEquipmentTray()"
+              [class.text-white]="showEquipmentTray()"
+              [class.border-amber-500]="showEquipmentTray()"
+              [class.bg-slate-100]="!showEquipmentTray()"
+              [class.dark:bg-gray-800]="!showEquipmentTray()"
+              [class.text-slate-800]="!showEquipmentTray()"
+              [class.dark:text-slate-100]="!showEquipmentTray()"
+              [class.border-slate-300]="!showEquipmentTray()"
+              [class.dark:border-gray-700]="!showEquipmentTray()"
+              [class.hover:bg-slate-200]="!showEquipmentTray()"
+              [class.dark:hover:bg-gray-700]="!showEquipmentTray()">
+        <span>🎽</span>
+        <span>{{ showEquipmentTray() ? 'Hide Equipment & Bench' : '+ Equipment & Bench' }}</span>
+      </button>
 
-    @if (activeTool() === 'text') {
+      <!-- History Undo / Redo -->
+      <div class="inline-flex rounded-md shadow-sm overflow-hidden border border-slate-300 dark:border-gray-700 ml-auto shrink-0" role="group" aria-label="Undo and redo">
+        <button (click)="store.undo()" [disabled]="!store.canUndo()"
+                class="px-3 py-2 min-h-[42px] font-bold bg-slate-100 dark:bg-gray-800 hover:bg-slate-200 dark:hover:bg-gray-700 text-slate-800 dark:text-slate-100 disabled:opacity-40 transition-colors"
+                title="Undo last tactical change">Undo</button>
+        <button (click)="store.redo()" [disabled]="!store.canRedo()"
+                class="px-3 py-2 min-h-[42px] font-bold border-l border-slate-300 dark:border-gray-700 bg-slate-100 dark:bg-gray-800 hover:bg-slate-200 dark:hover:bg-gray-700 text-slate-800 dark:text-slate-100 disabled:opacity-40 transition-colors"
+                title="Redo previous tactical change">Redo</button>
+      </div>
+    </fieldset>
+
+    <!-- Secondary Match Setup, Pitch View & Ink Strip -->
+    <fieldset class="flex flex-wrap items-center gap-2.5 mb-2.5 p-2 rounded-lg bg-[var(--tb-bg-surface-elevated)] border border-[var(--tb-border-subtle)] text-xs min-w-0"
+              [class.hidden]="!showPitchSettings()"
+              [class.md:flex]="true"
+              [disabled]="isPlaying() || isExporting()">
+      <!-- Squad Preset / Empty Pitch Mode -->
       <div class="flex items-center gap-1.5">
-        <input type="text" placeholder="Label text (then click pitch)..."
-               class="bg-gray-900 text-white px-2 py-1 rounded border border-indigo-500 w-44"
-               [value]="pendingText()"
-               (input)="pendingText.set($any($event.target).value)" />
-        <select aria-label="Text size"
-                class="bg-gray-700 text-white rounded px-1.5 py-1"
-                [value]="textSize()"
-                (change)="textSize.set(+$any($event.target).value)">
-          <option [value]="14">S</option>
-          <option [value]="18">M</option>
-          <option [value]="24">L</option>
+        <span class="font-bold text-amber-600 dark:text-amber-400">Mode:</span>
+        <select aria-label="Squad preset mode"
+                class="bg-[var(--tb-bg-surface)] text-slate-900 dark:text-white rounded-md px-2 py-1.5 font-semibold border border-[var(--tb-border)] min-h-[36px]"
+                [value]="store.squadPreset()"
+                (change)="onSquadPresetChange($any($event.target).value)">
+          @for (sp of squadPresets; track sp.value) {
+            <option [value]="sp.value">{{ sp.label }}</option>
+          }
         </select>
       </div>
-    }
 
-    <button type="button" (click)="showEquipmentTray.set(!showEquipmentTray())"
-            class="ml-auto px-2.5 py-1 font-bold rounded transition-colors"
-            [class.bg-amber-600]="showEquipmentTray()"
-            [class.bg-gray-700]="!showEquipmentTray()">
-      {{ showEquipmentTray() ? 'Hide Equipment & Bench' : '+ Equipment & Bench' }}
-    </button>
-  </fieldset>
+      <!-- Home Team Formation & Color -->
+      <div class="flex items-center gap-1.5">
+        <span class="inline-block w-3.5 h-3.5 rounded-full border border-white/60 shadow-sm" [style.background]="store.homeColor()"></span>
+        <span class="font-bold text-slate-800 dark:text-slate-200">Home:</span>
+        <select aria-label="Home formation"
+                class="bg-[var(--tb-bg-surface)] text-slate-900 dark:text-white rounded-md px-2 py-1.5 font-semibold border border-[var(--tb-border)] min-h-[36px]"
+                [value]="store.homeFormation()"
+                (change)="onFormationChange('home', $any($event.target).value)">
+          @for (f of formations; track f) {
+            <option [value]="f">{{ f }}</option>
+          }
+        </select>
+        <input type="color" aria-label="Home team color"
+               class="w-7 h-7 rounded-md cursor-pointer bg-transparent border-0 p-0"
+               [value]="store.homeColor()"
+               (input)="onTeamColorChange('home', $any($event.target).value)" />
+      </div>
+
+      <!-- Away Team Formation & Color -->
+      <div class="flex items-center gap-1.5">
+        <span class="inline-block w-3.5 h-3.5 rounded-full border border-white/60 shadow-sm" [style.background]="store.awayColor()"></span>
+        <span class="font-bold text-slate-800 dark:text-slate-200">Away:</span>
+        <select aria-label="Away formation"
+                class="bg-[var(--tb-bg-surface)] text-slate-900 dark:text-white rounded-md px-2 py-1.5 font-semibold border border-[var(--tb-border)] min-h-[36px]"
+                [value]="store.awayFormation()"
+                (change)="onFormationChange('away', $any($event.target).value)">
+          @for (f of formations; track f) {
+            <option [value]="f">{{ f }}</option>
+          }
+        </select>
+        <input type="color" aria-label="Away team color"
+               class="w-7 h-7 rounded-md cursor-pointer bg-transparent border-0 p-0"
+               [value]="store.awayColor()"
+               (input)="onTeamColorChange('away', $any($event.target).value)" />
+      </div>
+
+      <span class="text-[var(--tb-border)] hidden lg:inline">|</span>
+
+      <!-- Pitch View, Zoom (70% - 200%) & Turf Toggles -->
+      <div class="flex items-center gap-1.5">
+        <span class="font-bold text-slate-800 dark:text-slate-200">Pitch:</span>
+        <select aria-label="Pitch view"
+                class="bg-[var(--tb-bg-surface)] text-slate-900 dark:text-white rounded-md px-2 py-1.5 font-semibold border border-[var(--tb-border)] min-h-[36px]"
+                [value]="pitchView()"
+                (change)="setPitchView($any($event.target).value)">
+          <option value="full">Full Horizontal</option>
+          <option value="half-left">Half Pitch (Left)</option>
+          <option value="half-right">Half Pitch (Right)</option>
+          <option value="vertical">Full Vertical</option>
+        </select>
+
+        <div class="inline-flex items-center rounded-md border border-[var(--tb-border)] bg-[var(--tb-bg-surface)] overflow-hidden min-h-[36px]" role="group" aria-label="Board zoom controls">
+          <button type="button" (click)="stepBoardZoom(-1)"
+                  class="px-2 py-1 hover:bg-slate-200 dark:hover:bg-gray-700 text-slate-800 dark:text-slate-100 font-bold text-sm min-w-[32px] min-h-[36px]"
+                  title="Zoom out" aria-label="Zoom out">−</button>
+          <select aria-label="Board zoom"
+                  class="bg-[var(--tb-bg-surface)] text-slate-900 dark:text-white px-2 py-1 font-semibold border-x border-[var(--tb-border)] min-h-[36px]"
+                  title="Board zoom level"
+                  [value]="boardZoom()"
+                  (change)="setBoardZoom(+$any($event.target).value)">
+            <option value="0.7">70%</option>
+            <option value="0.8">80%</option>
+            <option value="0.85">85%</option>
+            <option value="0.9">90%</option>
+            <option value="0.95">95%</option>
+            <option value="1">100%</option>
+            <option value="1.05">105%</option>
+            <option value="1.1">110%</option>
+            <option value="1.15">115%</option>
+            <option value="1.2">120%</option>
+            <option value="1.3">130%</option>
+            <option value="1.5">150%</option>
+            <option value="1.75">175%</option>
+            <option value="2">200%</option>
+          </select>
+          <button type="button" (click)="stepBoardZoom(1)"
+                  class="px-2 py-1 hover:bg-slate-200 dark:hover:bg-gray-700 text-slate-800 dark:text-slate-100 font-bold text-sm min-w-[32px] min-h-[36px]"
+                  title="Zoom in" aria-label="Zoom in">+</button>
+        </div>
+
+        <label class="inline-flex items-center gap-1.5 cursor-pointer ml-1 select-none font-semibold text-slate-800 dark:text-slate-200">
+          <input type="checkbox" [checked]="showStripes()" (change)="toggleStripes()" class="rounded border-gray-400" />
+          Stripes
+        </label>
+        <label class="inline-flex items-center gap-1.5 cursor-pointer ml-1 select-none font-semibold text-slate-800 dark:text-slate-200">
+          <input type="checkbox" [checked]="showMarkings()" (change)="toggleMarkings()" class="rounded border-gray-400" />
+          Lines
+        </label>
+        <select aria-label="Pitch division grid"
+                class="bg-[var(--tb-bg-surface)] text-slate-900 dark:text-white rounded-md px-2 py-1.5 font-semibold border border-emerald-500/40 min-h-[36px] ml-1"
+                title="Primary pitch coordinate grid"
+                [value]="divisionsConfig().grid"
+                (change)="setDivisionGrid($any($event.target).value)">
+          <option value="none">Grid: Off</option>
+          <option value="thirds">Grid: 3 Thirds Only</option>
+          <option value="channels">Grid: 5 Channels Only</option>
+          <option value="thirds-channels">Grid: Thirds &amp; 5 Channels</option>
+          <option value="zones-18">Grid: 18-Zone (1–18)</option>
+          <option value="zones-20">Grid: 20-Zone (Positional)</option>
+        </select>
+      </div>
+
+      <span class="text-[var(--tb-border)] hidden lg:inline">|</span>
+
+      <!-- Drawing Color & Thickness -->
+      <div class="flex items-center gap-1.5">
+        <span class="font-bold text-slate-800 dark:text-slate-200">Ink:</span>
+        @for (c of drawingColors; track c.hex) {
+          <button type="button" (click)="drawColor.set(c.hex)"
+                  class="w-5 h-5 rounded-full border transition-transform shadow-sm min-w-[20px] min-h-[20px]"
+                  [style.background]="c.hex"
+                  [class.scale-125]="drawColor() === c.hex"
+                  [class.ring-2]="drawColor() === c.hex"
+                  [class.ring-offset-1]="drawColor() === c.hex"
+                  [class.ring-blue-500]="drawColor() === c.hex"
+                  [class.border-white]="drawColor() === c.hex"
+                  [class.border-gray-400]="drawColor() !== c.hex"
+                  [title]="c.name"></button>
+        }
+        <select aria-label="Stroke thickness"
+                class="bg-[var(--tb-bg-surface)] text-slate-900 dark:text-white rounded-md px-2 py-1 font-semibold border border-[var(--tb-border)] min-h-[32px] ml-1"
+                [value]="drawWidth()"
+                (change)="drawWidth.set(+$any($event.target).value)">
+          <option [value]="2.5">Thin</option>
+          <option [value]="4">Med</option>
+          <option [value]="6.5">Thick</option>
+        </select>
+      </div>
+
+      @if (activeTool() === 'text') {
+        <div class="flex items-center gap-1.5 ml-auto">
+          <input type="text" placeholder="Label text (then click pitch)..."
+                 class="bg-[var(--tb-bg-surface)] text-slate-900 dark:text-white px-2.5 py-1 rounded-md border border-indigo-500 w-48 min-h-[32px]"
+                 [value]="pendingText()"
+                 (input)="pendingText.set($any($event.target).value)" />
+          <select aria-label="Text size"
+                  class="bg-[var(--tb-bg-surface)] text-slate-900 dark:text-white rounded-md px-2 py-1 border border-[var(--tb-border)] min-h-[32px]"
+                  [value]="textSize()"
+                  (change)="textSize.set(+$any($event.target).value)">
+            <option [value]="14">S</option>
+            <option [value]="18">M</option>
+            <option [value]="24">L</option>
+          </select>
+        </div>
+      }
+    </fieldset>
+  }
 
   <!-- Collapsible Pitch Tactical Divisions & Specialized Sub-Zones Bar -->
   @if (showDivisionsPanel()) {
-    <div class="flex flex-wrap items-center gap-2 mb-2 px-3 py-2 rounded bg-emerald-950/85 border border-emerald-500/50 text-xs">
+    <div class="flex flex-wrap items-center gap-2 mb-2 p-2.5 rounded-lg bg-[var(--tb-bg-surface)] border border-emerald-500/50 shadow-md text-xs">
       <div class="flex flex-wrap items-center gap-1.5">
-        <span class="font-bold text-emerald-300">Primary Grid (Pick 1):</span>
-        <div class="inline-flex rounded overflow-hidden border border-emerald-600/50" role="group" aria-label="Primary coordinate grid">
+        <span class="font-bold text-emerald-700 dark:text-emerald-300">Primary Grid (Pick 1):</span>
+        <div class="inline-flex rounded-md overflow-hidden border border-slate-300 dark:border-gray-700" role="group" aria-label="Primary coordinate grid">
           <button type="button" (click)="setDivisionGrid('none')"
-                  class="px-2 py-1 font-bold transition-colors"
+                  class="px-2.5 py-1.5 min-h-[36px] font-bold transition-colors"
                   [class.bg-emerald-600]="divisionsConfig().grid === 'none'"
-                  [class.bg-gray-800]="divisionsConfig().grid !== 'none'"
+                  [class.text-white]="divisionsConfig().grid === 'none'"
+                  [class.bg-slate-100]="divisionsConfig().grid !== 'none'"
+                  [class.dark:bg-gray-800]="divisionsConfig().grid !== 'none'"
+                  [class.text-slate-800]="divisionsConfig().grid !== 'none'"
+                  [class.dark:text-slate-100]="divisionsConfig().grid !== 'none'"
                   title="No full-pitch grid lines (sub-zones can still be shown cleanly)">
             Off
           </button>
           <button type="button" (click)="setDivisionGrid('thirds')"
-                  class="px-2 py-1 font-bold border-l border-gray-700 transition-colors"
+                  class="px-2.5 py-1.5 min-h-[36px] font-bold border-l border-slate-300 dark:border-gray-700 transition-colors"
                   [class.bg-emerald-600]="divisionsConfig().grid === 'thirds'"
-                  [class.bg-gray-800]="divisionsConfig().grid !== 'thirds'"
+                  [class.text-white]="divisionsConfig().grid === 'thirds'"
+                  [class.bg-slate-100]="divisionsConfig().grid !== 'thirds'"
+                  [class.dark:bg-gray-800]="divisionsConfig().grid !== 'thirds'"
+                  [class.text-slate-800]="divisionsConfig().grid !== 'thirds'"
+                  [class.dark:text-slate-100]="divisionsConfig().grid !== 'thirds'"
                   title="3 Horizontal Thirds Only: Defensive (0–35m), Middle (35–70m), Final (70–105m)">
             3 Thirds
           </button>
           <button type="button" (click)="setDivisionGrid('channels')"
-                  class="px-2 py-1 font-bold border-l border-gray-700 transition-colors"
+                  class="px-2.5 py-1.5 min-h-[36px] font-bold border-l border-slate-300 dark:border-gray-700 transition-colors"
                   [class.bg-emerald-600]="divisionsConfig().grid === 'channels'"
-                  [class.bg-gray-800]="divisionsConfig().grid !== 'channels'"
+                  [class.text-white]="divisionsConfig().grid === 'channels'"
+                  [class.bg-slate-100]="divisionsConfig().grid !== 'channels'"
+                  [class.dark:bg-gray-800]="divisionsConfig().grid !== 'channels'"
+                  [class.text-slate-800]="divisionsConfig().grid !== 'channels'"
+                  [class.dark:text-slate-100]="divisionsConfig().grid !== 'channels'"
                   title="5 Vertical Channels Only: Left Flank, Left Half-Space, Central Corridor, Right Half-Space, Right Flank">
             5 Channels
           </button>
           <button type="button" (click)="setDivisionGrid('thirds-channels')"
-                  class="px-2 py-1 font-bold border-l border-gray-700 transition-colors"
+                  class="px-2.5 py-1.5 min-h-[36px] font-bold border-l border-slate-300 dark:border-gray-700 transition-colors"
                   [class.bg-emerald-600]="divisionsConfig().grid === 'thirds-channels'"
-                  [class.bg-gray-800]="divisionsConfig().grid !== 'thirds-channels'"
+                  [class.text-white]="divisionsConfig().grid === 'thirds-channels'"
+                  [class.bg-slate-100]="divisionsConfig().grid !== 'thirds-channels'"
+                  [class.dark:bg-gray-800]="divisionsConfig().grid !== 'thirds-channels'"
+                  [class.text-slate-800]="divisionsConfig().grid !== 'thirds-channels'"
+                  [class.dark:text-slate-100]="divisionsConfig().grid !== 'thirds-channels'"
                   title="3 Horizontal Thirds (0–35–70–105m) + 5 FIFA-marking Vertical Channels">
             Thirds + 5 Channels
           </button>
           <button type="button" (click)="setDivisionGrid('zones-18')"
-                  class="px-2 py-1 font-bold border-l border-gray-700 transition-colors"
+                  class="px-2.5 py-1.5 min-h-[36px] font-bold border-l border-slate-300 dark:border-gray-700 transition-colors"
                   [class.bg-emerald-600]="divisionsConfig().grid === 'zones-18'"
-                  [class.bg-gray-800]="divisionsConfig().grid !== 'zones-18'"
+                  [class.text-white]="divisionsConfig().grid === 'zones-18'"
+                  [class.bg-slate-100]="divisionsConfig().grid !== 'zones-18'"
+                  [class.dark:bg-gray-800]="divisionsConfig().grid !== 'zones-18'"
+                  [class.text-slate-800]="divisionsConfig().grid !== 'zones-18'"
+                  [class.dark:text-slate-100]="divisionsConfig().grid !== 'zones-18'"
                   title="Standard 18-Zone Grid (3 equal lanes × 6 strips, numbered 1 to 18)">
             18-Zone (1–18)
           </button>
           <button type="button" (click)="setDivisionGrid('zones-20')"
-                  class="px-2 py-1 font-bold border-l border-gray-700 transition-colors"
+                  class="px-2.5 py-1.5 min-h-[36px] font-bold border-l border-slate-300 dark:border-gray-700 transition-colors"
                   [class.bg-emerald-600]="divisionsConfig().grid === 'zones-20'"
-                  [class.bg-gray-800]="divisionsConfig().grid !== 'zones-20'"
+                  [class.text-white]="divisionsConfig().grid === 'zones-20'"
+                  [class.bg-slate-100]="divisionsConfig().grid !== 'zones-20'"
+                  [class.dark:bg-gray-800]="divisionsConfig().grid !== 'zones-20'"
+                  [class.text-slate-800]="divisionsConfig().grid !== 'zones-20'"
+                  [class.dark:text-slate-100]="divisionsConfig().grid !== 'zones-20'"
                   title="20-Zone Juego de Posición (5 Channels × 4 Tiers: Build-Up, Progression, Creation, Finishing)">
-            20-Zone (B-LF..F-RF)
+            20-Zone
           </button>
         </div>
       </div>
 
-      <span class="text-emerald-700">|</span>
+      <span class="text-[var(--tb-border)] hidden sm:inline">|</span>
 
       <div class="flex flex-wrap items-center gap-1.5">
-        <span class="font-bold text-amber-300">Sub-Zones (Layer Any):</span>
+        <span class="font-bold text-amber-700 dark:text-amber-400">Sub-Zones:</span>
         <button type="button" (click)="toggleSubZone('zone14')"
-                class="px-2 py-1 rounded font-bold border transition-colors"
+                class="px-2.5 py-1.5 min-h-[36px] rounded-md font-bold border transition-colors"
                 [class.bg-amber-600]="divisionsConfig().subZones.zone14"
-                [class.border-amber-300]="divisionsConfig().subZones.zone14"
-                [class.bg-gray-800]="!divisionsConfig().subZones.zone14"
-                [class.border-gray-600]="!divisionsConfig().subZones.zone14"
-                title="Zone 14 (Assist Zone): X 70–88.5m, Y 22.67–45.33m directly in front of opponent penalty box">
-          Zone 14 (Assist)
+                [class.text-white]="divisionsConfig().subZones.zone14"
+                [class.border-amber-400]="divisionsConfig().subZones.zone14"
+                [class.bg-slate-100]="!divisionsConfig().subZones.zone14"
+                [class.dark:bg-gray-800]="!divisionsConfig().subZones.zone14"
+                [class.text-slate-800]="!divisionsConfig().subZones.zone14"
+                [class.dark:text-slate-100]="!divisionsConfig().subZones.zone14"
+                [class.border-slate-300]="!divisionsConfig().subZones.zone14"
+                [class.dark:border-gray-700]="!divisionsConfig().subZones.zone14"
+                title="Zone 14 (Assist Zone): directly in front of opponent penalty box">
+          Zone 14
         </button>
         <button type="button" (click)="toggleSubZone('goldenZone')"
-                class="px-2 py-1 rounded font-bold border transition-colors"
+                class="px-2.5 py-1.5 min-h-[36px] rounded-md font-bold border transition-colors"
                 [class.bg-emerald-600]="divisionsConfig().subZones.goldenZone"
-                [class.border-emerald-300]="divisionsConfig().subZones.goldenZone"
-                [class.bg-gray-800]="!divisionsConfig().subZones.goldenZone"
-                [class.border-gray-600]="!divisionsConfig().subZones.goldenZone"
-                title="Golden Zone: Central high-xG rectangle inside penalty box (X 94–105m, Y 24.84–43.16m)">
+                [class.text-white]="divisionsConfig().subZones.goldenZone"
+                [class.border-emerald-400]="divisionsConfig().subZones.goldenZone"
+                [class.bg-slate-100]="!divisionsConfig().subZones.goldenZone"
+                [class.dark:bg-gray-800]="!divisionsConfig().subZones.goldenZone"
+                [class.text-slate-800]="!divisionsConfig().subZones.goldenZone"
+                [class.dark:text-slate-100]="!divisionsConfig().subZones.goldenZone"
+                [class.border-slate-300]="!divisionsConfig().subZones.goldenZone"
+                [class.dark:border-gray-700]="!divisionsConfig().subZones.goldenZone"
+                title="Golden Zone: Central high-xG rectangle inside penalty box">
           Golden Zone
         </button>
         <button type="button" (click)="toggleSubZone('pockets')"
-                class="px-2 py-1 rounded font-bold border transition-colors"
+                class="px-2.5 py-1.5 min-h-[36px] rounded-md font-bold border transition-colors"
                 [class.bg-sky-600]="divisionsConfig().subZones.pockets"
-                [class.border-sky-300]="divisionsConfig().subZones.pockets"
-                [class.bg-gray-800]="!divisionsConfig().subZones.pockets"
-                [class.border-gray-600]="!divisionsConfig().subZones.pockets"
-                title="The Pockets: Left & Right Half-Spaces between opposition midfield and defensive lines (X 52.5–88.5m)">
-          Half-Space Pockets
+                [class.text-white]="divisionsConfig().subZones.pockets"
+                [class.border-sky-400]="divisionsConfig().subZones.pockets"
+                [class.bg-slate-100]="!divisionsConfig().subZones.pockets"
+                [class.dark:bg-gray-800]="!divisionsConfig().subZones.pockets"
+                [class.text-slate-800]="!divisionsConfig().subZones.pockets"
+                [class.dark:text-slate-100]="!divisionsConfig().subZones.pockets"
+                [class.border-slate-300]="!divisionsConfig().subZones.pockets"
+                [class.dark:border-gray-700]="!divisionsConfig().subZones.pockets"
+                title="The Pockets: Half-Spaces between opposition midfield and defensive lines">
+          Pockets
         </button>
         <button type="button" (click)="toggleSubZone('cutback')"
-                class="px-2 py-1 rounded font-bold border transition-colors"
+                class="px-2.5 py-1.5 min-h-[36px] rounded-md font-bold border transition-colors"
                 [class.bg-purple-600]="divisionsConfig().subZones.cutback"
-                [class.border-purple-300]="divisionsConfig().subZones.cutback"
-                [class.bg-gray-800]="!divisionsConfig().subZones.cutback"
-                [class.border-gray-600]="!divisionsConfig().subZones.cutback"
-                title="Byline Cutback Zones: Penalty box wide channels between 6-yard and 18-yard lines (X 88.5–105m)">
-          Byline Cutback
+                [class.text-white]="divisionsConfig().subZones.cutback"
+                [class.border-purple-400]="divisionsConfig().subZones.cutback"
+                [class.bg-slate-100]="!divisionsConfig().subZones.cutback"
+                [class.dark:bg-gray-800]="!divisionsConfig().subZones.cutback"
+                [class.text-slate-800]="!divisionsConfig().subZones.cutback"
+                [class.dark:text-slate-100]="!divisionsConfig().subZones.cutback"
+                [class.border-slate-300]="!divisionsConfig().subZones.cutback"
+                [class.dark:border-gray-700]="!divisionsConfig().subZones.cutback"
+                title="Byline Cutback Zones: Penalty box wide channels">
+          Cutback
         </button>
         <button type="button" (click)="toggleMirrorSubZones()"
-                class="px-2 py-1 rounded font-semibold border transition-colors"
+                class="px-2.5 py-1.5 min-h-[36px] rounded-md font-semibold border transition-colors"
                 [class.bg-indigo-600]="divisionsConfig().mirrorSubZones"
-                [class.border-indigo-300]="divisionsConfig().mirrorSubZones"
-                [class.bg-gray-800]="!divisionsConfig().mirrorSubZones"
-                [class.border-gray-600]="!divisionsConfig().mirrorSubZones"
+                [class.text-white]="divisionsConfig().mirrorSubZones"
+                [class.border-indigo-400]="divisionsConfig().mirrorSubZones"
+                [class.bg-slate-100]="!divisionsConfig().mirrorSubZones"
+                [class.dark:bg-gray-800]="!divisionsConfig().mirrorSubZones"
+                [class.text-slate-800]="!divisionsConfig().mirrorSubZones"
+                [class.dark:text-slate-100]="!divisionsConfig().mirrorSubZones"
+                [class.border-slate-300]="!divisionsConfig().mirrorSubZones"
+                [class.dark:border-gray-700]="!divisionsConfig().mirrorSubZones"
                 title="Mirror specialized sub-zones onto both defensive and attacking halves">
           ⇄ Both Halves
         </button>
         <button type="button" (click)="togglePositionalSpacing()"
-                class="px-2 py-1 rounded font-bold border transition-colors"
+                class="px-2.5 py-1.5 min-h-[36px] rounded-md font-bold border transition-colors"
                 [class.bg-rose-600]="divisionsConfig().checkPositionalSpacing"
-                [class.border-rose-300]="divisionsConfig().checkPositionalSpacing"
-                [class.bg-gray-800]="!divisionsConfig().checkPositionalSpacing"
-                [class.border-gray-600]="!divisionsConfig().checkPositionalSpacing"
-                title="Juego de Posición Spacing Rule Checker: Warns if >3 Home outfield players occupy the same Horizontal Tier or >2 occupy the same Vertical Channel">
-          ⚡ Spacing Rules
+                [class.text-white]="divisionsConfig().checkPositionalSpacing"
+                [class.border-rose-400]="divisionsConfig().checkPositionalSpacing"
+                [class.bg-slate-100]="!divisionsConfig().checkPositionalSpacing"
+                [class.dark:bg-gray-800]="!divisionsConfig().checkPositionalSpacing"
+                [class.text-slate-800]="!divisionsConfig().checkPositionalSpacing"
+                [class.dark:text-slate-100]="!divisionsConfig().checkPositionalSpacing"
+                [class.border-slate-300]="!divisionsConfig().checkPositionalSpacing"
+                [class.dark:border-gray-700]="!divisionsConfig().checkPositionalSpacing"
+                title="Juego de Posición Spacing Rule Checker">
+          ⚡ Spacing
         </button>
       </div>
 
       <div class="ml-auto flex items-center gap-1.5">
         <button type="button" (click)="enableAllSubZones()"
-                class="px-2 py-1 rounded bg-amber-700/80 hover:bg-amber-600 font-semibold">
-          All Sub-Zones
+                class="px-2.5 py-1.5 min-h-[36px] rounded-md bg-amber-600 hover:bg-amber-500 text-white font-semibold shadow-sm">
+          All
         </button>
         <button type="button" (click)="clearAllDivisions()"
-                class="px-2 py-1 rounded bg-rose-800/80 hover:bg-rose-700 font-semibold">
+                class="px-2.5 py-1.5 min-h-[36px] rounded-md bg-rose-700 hover:bg-rose-600 text-white font-semibold shadow-sm">
           Hide All
         </button>
         <button type="button" (click)="showDivisionsPanel.set(false)"
-                class="px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 font-semibold">
+                class="px-2.5 py-1.5 min-h-[36px] rounded-md bg-slate-100 dark:bg-gray-800 hover:bg-slate-200 dark:hover:bg-gray-700 text-slate-800 dark:text-slate-100 border border-slate-300 dark:border-gray-700 font-semibold">
           ✕
         </button>
       </div>
@@ -482,8 +753,8 @@
       (closeDrawer)="showCollections.set(false)" />
   }
 
-  <!-- The Canvas Container -->
-  <div class="bg-[#2e7d32] shadow-2xl overflow-hidden rounded-md touch-none select-none mx-auto w-full"
+  <!-- The Pitch Canvas Container -->
+  <div class="bg-[#2e7d32] shadow-2xl overflow-hidden rounded-lg touch-none select-none mx-auto w-full transition-all"
        [style.aspect-ratio]="containerAspect()"
        [style.max-width]="containerMaxWidth()"
        (dragover)="onCanvasDragOver($event)"

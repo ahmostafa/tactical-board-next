@@ -1,3 +1,63 @@
 @tailwind base;
 @tailwind components;
-@tailwind utilities;/* You can add global styles to this file, and also import other style files */
+@tailwind utilities;
+
+:root {
+  /* Daylight Theme (High contrast outdoor touchline mode) */
+  --tb-bg-app: #f1f5f9;
+  --tb-bg-surface: #ffffff;
+  --tb-bg-surface-elevated: #f8fafc;
+  --tb-border: #cbd5e1;
+  --tb-border-subtle: #e2e8f0;
+  --tb-text-primary: #0f172a;
+  --tb-text-secondary: #334155;
+  --tb-text-muted: #64748b;
+  --tb-button-bg: #e2e8f0;
+  --tb-button-hover: #cbd5e1;
+  --tb-button-text: #0f172a;
+  --tb-accent: #0284c7;
+}
+
+html.dark {
+  /* Night / OLED Mode */
+  --tb-bg-app: #090d16;
+  --tb-bg-surface: #111827;
+  --tb-bg-surface-elevated: #1f2937;
+  --tb-border: #374151;
+  --tb-border-subtle: #1e293b;
+  --tb-text-primary: #f8fafc;
+  --tb-text-secondary: #cbd5e1;
+  --tb-text-muted: #94a3b8;
+  --tb-button-bg: #1f2937;
+  --tb-button-hover: #374151;
+  --tb-button-text: #f8fafc;
+  --tb-accent: #38bdf8;
+}
+
+body {
+  background-color: var(--tb-bg-app);
+  color: var(--tb-text-primary);
+  transition: background-color 0.2s ease, color 0.2s ease;
+  overflow-x: hidden;
+}
+
+/* Touch ergonomic helper for 44x44px minimum target size */
+.touch-target {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Base Tactical Board button style with theme adaptation */
+.tb-btn-base {
+  background-color: var(--tb-button-bg);
+  color: var(--tb-button-text);
+  border-color: var(--tb-border);
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+
+  &:hover {
+    background-color: var(--tb-button-hover);
+  }
+}
