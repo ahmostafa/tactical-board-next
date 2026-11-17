@@ -1,4 +1,4 @@
-export const APP_VERSION = 'v1.1.0';
+export const APP_VERSION = 'v2.0.0';
 export const APP_RELEASE_DATE = '2026-11-17';
 export const APP_NAME = 'Tactical Board Next';
 export const APP_AUTHOR = 'Ahmed Mohamed';
