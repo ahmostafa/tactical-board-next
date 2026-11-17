@@ -10,6 +10,11 @@ import {
   getZone18,
   getZone20,
 } from './canvas/pitch-divisions';
+import {
+  projectPitchPoint,
+  unprojectPitchPoint,
+  projectPointList,
+} from './canvas/perspective-projection';
 
 describe('BoardStore & Tactical Features', () => {
   let store: InstanceType<typeof BoardStore>;
@@ -209,5 +214,40 @@ describe('BoardStore & Tactical Features', () => {
     store.redo();
     p10 = store.entities().find((e) => e.id === 'h10');
     expect(p10?.facing).toBe(359);
+  });
+
+  it('should accurately project and unproject coordinates in 3D perspective pitch view', () => {
+    // Test canonical pitch coordinates: corners and center
+    const testCoordinates: [number, number][] = [
+      [0, 0],         // Near-Left corner
+      [0, 680],       // Near-Right corner
+      [1050, 0],      // Far-Left corner
+      [1050, 680],    // Far-Right corner
+      [525, 340],     // Center spot
+      [110, 340],     // Near penalty spot
+      [940, 340],     // Far penalty spot
+    ];
+
+    for (const [px, py] of testCoordinates) {
+      const proj = projectPitchPoint(px, py);
+      expect(proj.x).toBeGreaterThan(0);
+      expect(proj.y).toBeGreaterThan(0);
+
+      // Depth scale: near should be significantly larger than far
+      if (px === 0) {
+        expect(proj.scale).toBeGreaterThan(1.0);
+      } else if (px === 1050) {
+        expect(proj.scale).toBeLessThan(0.7);
+      }
+
+      // Round-trip homography accuracy
+      const unproj = unprojectPitchPoint(proj.x, proj.y);
+      expect(Math.abs(unproj.x - px)).toBeLessThanOrEqual(2);
+      expect(Math.abs(unproj.y - py)).toBeLessThanOrEqual(2);
+    }
+
+    // Test projectPointList helper
+    const projectedList = projectPointList([0, 0, 1050, 680]);
+    expect(projectedList.length).toBe(4);
   });
 });

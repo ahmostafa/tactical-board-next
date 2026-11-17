@@ -3,7 +3,7 @@
 A modern, responsive, browser-based football tactical board for match analysis, set-piece design, and coaching sessions. Drag players, referees, and training equipment at 60fps, switch instant 11v11 formations, sketch curved tactical arrows in six styles, highlight tactical zones, animate multi-step plays on a keyframe timeline, organize schemes in a Collections Library, and export HD `.mp4` videos, animated `.gif` files, and `2x` `.png` images directly in the browser.
 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-Online-emerald?style=for-the-badge&logo=github)](https://ahmostafa.github.io/tactical-board-next/)
-[![Release](https://img.shields.io/badge/Release-v1.0.1-blue?style=for-the-badge)](https://github.com/ahmostafa/tactical-board-next/releases)
+[![Release](https://img.shields.io/badge/Release-v1.1.0-blue?style=for-the-badge)](https://github.com/ahmostafa/tactical-board-next/releases)
 [![License: ISC](https://img.shields.io/badge/License-ISC-amber?style=for-the-badge)](LICENSE)
 [![Privacy: Zero Cookies](https://img.shields.io/badge/Privacy-Zero%20Cookies-purple?style=for-the-badge)](#)
 
@@ -241,6 +241,7 @@ This repository follows [Semantic Versioning (SemVer)](https://semver.org/) (`vM
 
 | Version | Milestone Commit | Description & Key Features |
 | :--- | :--- | :--- |
+| **`v1.1.0`** | `HEAD` | **3D Broadcast Perspective & Tactile Controls**: Elevated 3D perspective pitch view with homography projection engine, logarithmic grass stripes, and protruding 3D goal nets; direct on-pitch 360° mouse & touch vision cone rotation with live degree badge; responsive mobile category dock; authentic sports agility training equipment icons; explicit transport playback controls (`[ ▶ Play ]`, `[ ⏹ Stop ]`, `[ ➔ Step ]`); and automated GitHub Release CI/CD pipeline. |
 | **`v1.0.1`** | `8425cef` | **Production Deployment & Resilience**: Automated GitHub Pages CI/CD pipeline, About dialog with live version badge, 404 Out-of-Bounds and runtime error recovery, SPA fallback routing, and privacy-friendly visitor analytics. |
 | **`v1.0.0`** | `73d13af` | **Official v1.0.0 Release**: Full FIFA `105m × 68m` pitch divisions (3 Thirds, 5 Channels, 18-Zone, 20-Zone *Juego de Posición*), specialized sub-zones (Zone 14, Golden Zone, Pockets, Cutbacks), live token coordinate badge, live *Juego de Posición* spacing rules checker, and smooth linear zoom scaling. |
 | **`v0.5.0`** | `f611977` | **Pragmatic Angular 22 Architecture**: Modularized into domain models (`models/`), state sanitizer (`state/`), pure Konva renderers (`canvas/pitch-renderer`, `arrow-renderer`, `entity-renderer`), injectable `BoardExportService` (`services/`), and 5 standalone UI sub-components (`components/`). |

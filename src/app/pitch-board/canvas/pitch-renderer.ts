@@ -9,8 +9,10 @@ import {
   PITCH_PAD_Y,
   FULL_VIEW_W,
   FULL_VIEW_H,
+  PitchViewMode,
   TacticalEntity,
 } from '../models/tactical-board.models';
+import { projectPitchPoint } from './perspective-projection';
 
 /**
  * Draws the stadium apron, mowed grass stripes, pitch markings, penalty boxes/arcs,
@@ -19,8 +21,14 @@ import {
 export function drawPitchSurface(
   pitchLayer: Konva.Layer,
   showStripes: boolean,
-  showMarkings: boolean
+  showMarkings: boolean,
+  viewMode: PitchViewMode = 'full'
 ): void {
+  if (viewMode === 'perspective') {
+    drawPerspectivePitchSurface(pitchLayer, showStripes, showMarkings);
+    return;
+  }
+
   pitchLayer.destroyChildren();
   const W = BASE_WIDTH;
   const H = BASE_HEIGHT;
@@ -184,6 +192,306 @@ export function drawPitchSurface(
     leftArc,
     rightArc
   );
+}
+
+/**
+ * Draws the 3D Perspective / Broadcast pitch surface with trapezoidal boundary,
+ * logarithmic mowing stripes, perspective-foreshortened center circle & boxes,
+ * and protruding 3D goal nets.
+ */
+export function drawPerspectivePitchSurface(
+  pitchLayer: Konva.Layer,
+  showStripes: boolean,
+  showMarkings: boolean
+): void {
+  pitchLayer.destroyChildren();
+
+  // 1. Stadium surround / apron (matching olive-green background in broadcast view)
+  pitchLayer.add(
+    new Konva.Rect({
+      x: -PITCH_PAD_X,
+      y: -PITCH_PAD_Y,
+      width: FULL_VIEW_W,
+      height: FULL_VIEW_H,
+      fill: '#607449',
+      listening: false,
+    })
+  );
+
+  // 2. In-bounds pitch turf trapezoid
+  const pNL = projectPitchPoint(0, 0);
+  const pNR = projectPitchPoint(0, BASE_HEIGHT);
+  const pFR = projectPitchPoint(BASE_WIDTH, BASE_HEIGHT);
+  const pFL = projectPitchPoint(BASE_WIDTH, 0);
+
+  const turfPoly = new Konva.Line({
+    points: [pNL.x, pNL.y, pNR.x, pNR.y, pFR.x, pFR.y, pFL.x, pFL.y],
+    fill: '#588344',
+    closed: true,
+    listening: false,
+  });
+  pitchLayer.add(turfPoly);
+
+  // 3. Alternating horizontal grass bands (10 stripes in perspective)
+  if (showStripes) {
+    const stripeCount = 10;
+    const stripeLen = BASE_WIDTH / stripeCount;
+    for (let i = 0; i < stripeCount; i++) {
+      if (i % 2 === 1) {
+        const x1 = i * stripeLen;
+        const x2 = (i + 1) * stripeLen;
+        const sNL = projectPitchPoint(x1, 0);
+        const sNR = projectPitchPoint(x1, BASE_HEIGHT);
+        const sFR = projectPitchPoint(x2, BASE_HEIGHT);
+        const sFL = projectPitchPoint(x2, 0);
+
+        pitchLayer.add(
+          new Konva.Line({
+            points: [sNL.x, sNL.y, sNR.x, sNR.y, sFR.x, sFR.y, sFL.x, sFL.y],
+            fill: 'rgba(0, 0, 0, 0.085)',
+            closed: true,
+            listening: false,
+          })
+        );
+      }
+    }
+  }
+
+  if (!showMarkings) return;
+
+  const lineConfig = { stroke: '#ffffff', strokeWidth: 3.5, listening: false };
+
+  // 4. White boundary lines
+  pitchLayer.add(
+    new Konva.Line({
+      points: [pNL.x, pNL.y, pNR.x, pNR.y, pFR.x, pFR.y, pFL.x, pFL.y],
+      closed: true,
+      ...lineConfig,
+    })
+  );
+
+  // 5. Halfway line
+  const hwL = projectPitchPoint(BASE_WIDTH / 2, 0);
+  const hwR = projectPitchPoint(BASE_WIDTH / 2, BASE_HEIGHT);
+  pitchLayer.add(
+    new Konva.Line({
+      points: [hwL.x, hwL.y, hwR.x, hwR.y],
+      ...lineConfig,
+    })
+  );
+
+  // 6. Center Circle (mathematically exact perspective ellipse)
+  const center = projectPitchPoint(BASE_WIDTH / 2, BASE_HEIGHT / 2);
+  const circlePoints: number[] = [];
+  const radiusMeters = 91.5;
+  for (let a = 0; a <= 360; a += 10) {
+    const rad = (a * Math.PI) / 180;
+    const px = BASE_WIDTH / 2 + Math.cos(rad) * radiusMeters;
+    const py = BASE_HEIGHT / 2 + Math.sin(rad) * radiusMeters;
+    const proj = projectPitchPoint(px, py);
+    circlePoints.push(proj.x, proj.y);
+  }
+  pitchLayer.add(
+    new Konva.Line({
+      points: circlePoints,
+      closed: true,
+      ...lineConfig,
+    })
+  );
+
+  // Center Spot
+  pitchLayer.add(
+    new Konva.Circle({
+      x: center.x,
+      y: center.y,
+      radius: 4,
+      fill: '#ffffff',
+      listening: false,
+    })
+  );
+
+  // Helper for sampling arcs in perspective
+  const drawPerspectiveArc = (
+    centerX: number,
+    centerY: number,
+    radius: number,
+    startDeg: number,
+    endDeg: number
+  ) => {
+    const pts: number[] = [];
+    const step = (endDeg - startDeg) / 16;
+    for (let a = startDeg; a <= endDeg; a += step) {
+      const rad = (a * Math.PI) / 180;
+      const px = centerX + Math.cos(rad) * radius;
+      const py = centerY + Math.sin(rad) * radius;
+      const proj = projectPitchPoint(px, py);
+      pts.push(proj.x, proj.y);
+    }
+    return new Konva.Line({ points: pts, ...lineConfig });
+  };
+
+  // 7. Near Penalty Area (Bottom / Defending side)
+  const nearBoxY1 = (BASE_HEIGHT - 403.2) / 2;
+  const nearBoxY2 = (BASE_HEIGHT + 403.2) / 2;
+  const bNL = projectPitchPoint(0, nearBoxY1);
+  const bNR = projectPitchPoint(0, nearBoxY2);
+  const bFL = projectPitchPoint(165, nearBoxY1);
+  const bFR = projectPitchPoint(165, nearBoxY2);
+
+  pitchLayer.add(
+    new Konva.Line({
+      points: [bNL.x, bNL.y, bFL.x, bFL.y, bFR.x, bFR.y, bNR.x, bNR.y],
+      ...lineConfig,
+    })
+  );
+
+  // Near 6-yard Goal Area
+  const nearGoalY1 = (BASE_HEIGHT - 183.2) / 2;
+  const nearGoalY2 = (BASE_HEIGHT + 183.2) / 2;
+  const gNL = projectPitchPoint(0, nearGoalY1);
+  const gNR = projectPitchPoint(0, nearGoalY2);
+  const gFL = projectPitchPoint(55, nearGoalY1);
+  const gFR = projectPitchPoint(55, nearGoalY2);
+
+  pitchLayer.add(
+    new Konva.Line({
+      points: [gNL.x, gNL.y, gFL.x, gFL.y, gFR.x, gFR.y, gNR.x, gNR.y],
+      ...lineConfig,
+    })
+  );
+
+  // Near Penalty Spot
+  const nearSpot = projectPitchPoint(110, BASE_HEIGHT / 2);
+  pitchLayer.add(
+    new Konva.Circle({
+      x: nearSpot.x,
+      y: nearSpot.y,
+      radius: 4,
+      fill: '#ffffff',
+      listening: false,
+    })
+  );
+
+  // Near Penalty Arc (D-arc pointing towards center)
+  pitchLayer.add(drawPerspectiveArc(110, BASE_HEIGHT / 2, 91.5, -53, 53));
+
+  // 8. Far Penalty Area (Top / Attacking side)
+  const fBoxNL = projectPitchPoint(BASE_WIDTH, nearBoxY1);
+  const fBoxNR = projectPitchPoint(BASE_WIDTH, nearBoxY2);
+  const fBoxFL = projectPitchPoint(BASE_WIDTH - 165, nearBoxY1);
+  const fBoxFR = projectPitchPoint(BASE_WIDTH - 165, nearBoxY2);
+
+  pitchLayer.add(
+    new Konva.Line({
+      points: [fBoxNL.x, fBoxNL.y, fBoxFL.x, fBoxFL.y, fBoxFR.x, fBoxFR.y, fBoxNR.x, fBoxNR.y],
+      ...lineConfig,
+    })
+  );
+
+  // Far 6-yard Goal Area
+  const fGoalNL = projectPitchPoint(BASE_WIDTH, nearGoalY1);
+  const fGoalNR = projectPitchPoint(BASE_WIDTH, nearGoalY2);
+  const fGoalFL = projectPitchPoint(BASE_WIDTH - 55, nearGoalY1);
+  const fGoalFR = projectPitchPoint(BASE_WIDTH - 55, nearGoalY2);
+
+  pitchLayer.add(
+    new Konva.Line({
+      points: [fGoalNL.x, fGoalNL.y, fGoalFL.x, fGoalFL.y, fGoalFR.x, fGoalFR.y, fGoalNR.x, fGoalNR.y],
+      ...lineConfig,
+    })
+  );
+
+  // Far Penalty Spot
+  const farSpot = projectPitchPoint(BASE_WIDTH - 110, BASE_HEIGHT / 2);
+  pitchLayer.add(
+    new Konva.Circle({
+      x: farSpot.x,
+      y: farSpot.y,
+      radius: 3.5,
+      fill: '#ffffff',
+      listening: false,
+    })
+  );
+
+  // Far Penalty Arc (D-arc pointing towards center)
+  pitchLayer.add(drawPerspectiveArc(BASE_WIDTH - 110, BASE_HEIGHT / 2, 91.5, 127, 233));
+
+  // 9. 3D Protruding Goal Nets
+  // Near Goal Net (protrudes downwards into foreground)
+  const nearPost1 = projectPitchPoint(0, GOAL_TOP);
+  const nearPost2 = projectPitchPoint(0, GOAL_TOP + GOAL_WIDTH);
+  const netNearGroup = new Konva.Group({ listening: false });
+  const netNearDepth = 48;
+
+  netNearGroup.add(
+    new Konva.Rect({
+      x: nearPost1.x,
+      y: nearPost1.y,
+      width: nearPost2.x - nearPost1.x,
+      height: netNearDepth,
+      fill: 'rgba(255, 255, 255, 0.08)',
+      stroke: '#ffffff',
+      strokeWidth: 3,
+    })
+  );
+
+  for (let y = nearPost1.y + 6; y < nearPost1.y + netNearDepth; y += 6) {
+    netNearGroup.add(
+      new Konva.Line({
+        points: [nearPost1.x, y, nearPost2.x, y],
+        stroke: 'rgba(255, 255, 255, 0.65)',
+        strokeWidth: 1.1,
+      })
+    );
+  }
+  for (let x = nearPost1.x + 8; x < nearPost2.x; x += 8) {
+    netNearGroup.add(
+      new Konva.Line({
+        points: [x, nearPost1.y, x, nearPost1.y + netNearDepth],
+        stroke: 'rgba(255, 255, 255, 0.55)',
+        strokeWidth: 1,
+      })
+    );
+  }
+  pitchLayer.add(netNearGroup);
+
+  // Far Goal Net (protrudes upwards towards background)
+  const farPost1 = projectPitchPoint(BASE_WIDTH, GOAL_TOP);
+  const farPost2 = projectPitchPoint(BASE_WIDTH, GOAL_TOP + GOAL_WIDTH);
+  const netFarGroup = new Konva.Group({ listening: false });
+  const netFarDepth = 26;
+
+  netFarGroup.add(
+    new Konva.Rect({
+      x: farPost1.x,
+      y: farPost1.y - netFarDepth,
+      width: farPost2.x - farPost1.x,
+      height: netFarDepth,
+      fill: 'rgba(255, 255, 255, 0.08)',
+      stroke: '#ffffff',
+      strokeWidth: 2.5,
+    })
+  );
+
+  for (let y = farPost1.y - netFarDepth + 4.5; y < farPost1.y; y += 4.5) {
+    netFarGroup.add(
+      new Konva.Line({
+        points: [farPost1.x, y, farPost2.x, y],
+        stroke: 'rgba(255, 255, 255, 0.6)',
+        strokeWidth: 0.9,
+      })
+    );
+  }
+  for (let x = farPost1.x + 5; x < farPost2.x; x += 5) {
+    netFarGroup.add(
+      new Konva.Line({
+        points: [x, farPost1.y - netFarDepth, x, farPost1.y],
+        stroke: 'rgba(255, 255, 255, 0.5)',
+        strokeWidth: 0.9,
+      })
+    );
+  }
+  pitchLayer.add(netFarGroup);
 }
 
 export { drawPitchDivisions } from './pitch-divisions';

@@ -26,7 +26,7 @@ export type FormationName =
 
 export type SquadPreset = '11v11' | '9v9' | '7v7' | '5v5' | 'empty';
 
-export type PitchViewMode = 'full' | 'half-left' | 'half-right' | 'vertical';
+export type PitchViewMode = 'full' | 'half-left' | 'half-right' | 'vertical' | 'perspective';
 
 export type ActiveToolMode = 'move' | 'arrow' | 'shape' | 'text' | 'eraser';
 

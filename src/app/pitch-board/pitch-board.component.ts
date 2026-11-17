@@ -64,6 +64,11 @@ import {
   renderGoalScoredOverlay,
 } from './canvas/pitch-renderer';
 import {
+  projectPitchPoint,
+  unprojectPitchPoint,
+  projectPointList,
+} from './canvas/perspective-projection';
+import {
   DEFAULT_DIVISIONS_CONFIG,
   isAnyDivisionActive,
 } from './canvas/pitch-divisions';
@@ -244,7 +249,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
 
     this.ngZone.runOutsideAngular(() => {
       this.initCanvas();
-      drawPitchSurface(this.pitchLayer, this.showStripes(), this.showMarkings());
+      drawPitchSurface(this.pitchLayer, this.showStripes(), this.showMarkings(), this.pitchView());
       this.refreshDivisionsLayer();
       this.syncFromStore();
       this.setupDrawingEngine();
@@ -333,8 +338,22 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
   private renderArrows(arrows: TacticalArrow[], showHandles = false) {
     this.drawingLayer.destroyChildren();
     const isEraser = this.activeTool() === 'eraser';
+    const isPerspective = this.pitchView() === 'perspective';
     arrows.forEach((a) => {
-      const arrowGroup = createArrowGroup(a, isEraser);
+      let arrowData = a;
+      if (isPerspective) {
+        const p1 = projectPitchPoint(a.points[0], a.points[1]);
+        const p2 = projectPitchPoint(a.points[2], a.points[3]);
+        const cp = a.controlPoint ? projectPitchPoint(a.controlPoint[0], a.controlPoint[1]) : undefined;
+        const fp = a.pathPoints ? projectPointList(a.pathPoints) : undefined;
+        arrowData = {
+          ...a,
+          points: [p1.x, p1.y, p2.x, p2.y],
+          controlPoint: cp ? [cp.x, cp.y] : undefined,
+          pathPoints: fp,
+        };
+      }
+      const arrowGroup = createArrowGroup(arrowData, isEraser);
       if (isEraser) {
         arrowGroup.on('mouseenter', () => this.setStageCursor(CURSORS.eraserHot));
         arrowGroup.on('mouseleave', () => this.setStageCursor(this.defaultToolCursor()));
@@ -347,8 +366,8 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
       this.drawingLayer.add(arrowGroup);
 
       if (showHandles && !isEraser && a.style !== 'freehand') {
-        const [x1, y1, x2, y2] = a.points;
-        const [cx, cy] = a.controlPoint ?? [(x1 + x2) / 2, (y1 + y2) / 2];
+        const [x1, y1, x2, y2] = arrowData.points;
+        const [cx, cy] = arrowData.controlPoint ?? [(x1 + x2) / 2, (y1 + y2) / 2];
         const handle = new Konva.Circle({
           name: 'curve-handle',
           x: cx,
@@ -367,13 +386,14 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
         handle.on('dragstart', () => this.setStageCursor('grabbing'));
         handle.on('dragmove', () => {
           const p = handle.position();
-          updateArrowGroup(arrowGroup, a.points, a.style ?? 'pass', [p.x, p.y]);
+          updateArrowGroup(arrowGroup, arrowData.points, a.style ?? 'pass', [p.x, p.y]);
         });
         handle.on('dragend', () => {
           this.setStageCursor('grab');
           const p = handle.position();
+          const savedPos = isPerspective ? unprojectPitchPoint(p.x, p.y) : { x: Math.round(p.x), y: Math.round(p.y) };
           this.ngZone.run(() =>
-            this.store.updateArrowControl(a.id, [Math.round(p.x), Math.round(p.y)])
+            this.store.updateArrowControl(a.id, [savedPos.x, savedPos.y])
           );
         });
         this.drawingLayer.add(handle);
@@ -457,6 +477,8 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     this.pitchView.set(view);
     setTimeout(() => {
       this.applyStageViewport();
+      drawPitchSurface(this.pitchLayer, this.showStripes(), this.showMarkings(), view);
+      this.pitchLayer.batchDraw();
       this.refreshDivisionsLayer();
       this.syncFromStore();
     }, 0);
@@ -482,13 +504,13 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
 
   toggleStripes() {
     this.showStripes.set(!this.showStripes());
-    drawPitchSurface(this.pitchLayer, this.showStripes(), this.showMarkings());
+    drawPitchSurface(this.pitchLayer, this.showStripes(), this.showMarkings(), this.pitchView());
     this.pitchLayer.batchDraw();
   }
 
   toggleMarkings() {
     this.showMarkings.set(!this.showMarkings());
-    drawPitchSurface(this.pitchLayer, this.showStripes(), this.showMarkings());
+    drawPitchSurface(this.pitchLayer, this.showStripes(), this.showMarkings(), this.pitchView());
     this.pitchLayer.batchDraw();
   }
 
@@ -1002,16 +1024,23 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     renderGoalScoredOverlay(this.drawingLayer, frames[to].entities, this.uprightRotation());
     this.drawingLayer.opacity(frames[to].arrows.length > 0 ? 0 : 1);
 
+    const isPerspective = this.pitchView() === 'perspective';
     const tweens: Konva.Tween[] = [];
     frames[to].entities.forEach((e) => {
       const node = this.entityLayer.findOne('#' + e.id);
-      if (!node || (node.x() === e.x && node.y() === e.y)) return;
+      if (!node) return;
+      const targetPos = isPerspective
+        ? projectPitchPoint(e.x, e.y)
+        : { x: e.x, y: e.y, scale: 1 };
+      if (node.x() === targetPos.x && node.y() === targetPos.y) return;
       tweens.push(
         new Konva.Tween({
           node,
           duration: seconds,
-          x: e.x,
-          y: e.y,
+          x: targetPos.x,
+          y: targetPos.y,
+          scaleX: targetPos.scale ?? 1,
+          scaleY: targetPos.scale ?? 1,
           easing: Konva.Easings.EaseInOut,
         })
       );
@@ -1056,14 +1085,21 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     const progress = Konva.Easings.EaseInOut(t - i, 0, 1, 1);
     const next = new Map(frames[i + 1].entities.map((e) => [e.id, e]));
 
+    const isPerspective = this.pitchView() === 'perspective';
     frames[i].entities.forEach((a) => {
       const b = next.get(a.id);
       const node = this.entityLayer.findOne('#' + a.id);
       if (!b || !node) return;
-      node.position({
-        x: a.x + (b.x - a.x) * progress,
-        y: a.y + (b.y - a.y) * progress,
-      });
+      const curX = a.x + (b.x - a.x) * progress;
+      const curY = a.y + (b.y - a.y) * progress;
+      if (isPerspective) {
+        const p = projectPitchPoint(curX, curY);
+        node.position({ x: p.x, y: p.y });
+        node.scale({ x: p.scale, y: p.scale });
+      } else {
+        node.position({ x: curX, y: curY });
+        node.scale({ x: 1, y: 1 });
+      }
     });
 
     const activeIdx = t - i < 0.5 ? i : i + 1;
@@ -1321,6 +1357,12 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     const pos = this.stage.getPointerPosition();
     if (!pos) return null;
     const mapped = transform.point(pos);
+
+    if (this.pitchView() === 'perspective') {
+      const unproj = unprojectPitchPoint(mapped.x, mapped.y);
+      return [unproj.x, unproj.y];
+    }
+
     const inGoalY = mapped.y >= GOAL_TOP && mapped.y <= GOAL_TOP + GOAL_WIDTH;
     const minX = inGoalY ? -GOAL_DEPTH : 0;
     const maxX = inGoalY ? BASE_WIDTH + GOAL_DEPTH : BASE_WIDTH;
@@ -1499,6 +1541,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
       isPlaying: () => this.isPlaying(),
       isExporting: () => this.isExporting(),
       uprightRotation: () => this.uprightRotation(),
+      pitchView: () => this.pitchView(),
       selectedEntityId: () => this.selectedEntityId(),
       homeColor: () => this.store.homeColor(),
       awayColor: () => this.store.awayColor(),

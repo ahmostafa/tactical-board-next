@@ -10,12 +10,14 @@ import {
 } from '../models/tactical-board.models';
 import { PITCH_ALIGNED_EQUIPMENT, renderEquipmentShape } from '../equipment-renderer';
 import { addClassicBall } from './pitch-renderer';
+import { projectPitchPoint, unprojectPitchPoint } from './perspective-projection';
 
 export interface EntityRenderCallbacks {
   activeTool: () => ActiveToolMode;
   isPlaying: () => boolean;
   isExporting: () => boolean;
   uprightRotation: () => number;
+  pitchView?: () => PitchViewMode;
   selectedEntityId: () => string | null;
   homeColor: () => string;
   awayColor: () => string;
@@ -213,7 +215,12 @@ export function syncEntityNodes(
       group.on('dragend', () => {
         cb.setStageCursor('grab');
         const newPos = group!.position();
-        cb.onUpdatePosition(entity.id, Math.round(newPos.x), Math.round(newPos.y));
+        if (cb.pitchView?.() === 'perspective') {
+          const unproj = unprojectPitchPoint(newPos.x, newPos.y);
+          cb.onUpdatePosition(entity.id, unproj.x, unproj.y);
+        } else {
+          cb.onUpdatePosition(entity.id, Math.round(newPos.x), Math.round(newPos.y));
+        }
       });
 
       group.on('click tap contextmenu', (e) => {
@@ -235,7 +242,13 @@ export function syncEntityNodes(
       entityLayer.add(group);
     }
 
-    group.position({ x: entity.x, y: entity.y });
+    const isPerspective = cb.pitchView?.() === 'perspective';
+    const screenCoord = isPerspective
+      ? projectPitchPoint(entity.x, entity.y)
+      : { x: entity.x, y: entity.y, scale: 1 };
+
+    group.position({ x: screenCoord.x, y: screenCoord.y });
+    group.scale({ x: screenCoord.scale, y: screenCoord.scale });
     if (isEquip) {
       const isPitchAligned =
         entity.equipmentKind && PITCH_ALIGNED_EQUIPMENT.has(entity.equipmentKind);
