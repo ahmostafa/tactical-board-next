@@ -277,7 +277,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     this.renderShapes(shapes);
     this.renderArrows(arrows, !this.isPlaying() && !this.isExporting());
     this.renderTexts(texts, note);
-    renderGoalScoredOverlay(this.drawingLayer, entities, this.uprightRotation());
+    renderGoalScoredOverlay(this.drawingLayer, entities, this.uprightRotation(), this.pitchView());
     this.drawingLayer.opacity(1);
     if (this.divisionsConfig().checkPositionalSpacing) {
       this.refreshDivisionsLayer();
@@ -300,8 +300,9 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
   private renderShapes(shapes: TacticalShape[]) {
     this.shapesLayer.destroyChildren();
     const isEraser = this.activeTool() === 'eraser';
+    const isPerspective = this.pitchView() === 'perspective';
     shapes.forEach((s) => {
-      const node = createShapeNode(s, isEraser);
+      const node = createShapeNode(s, isEraser, isPerspective);
       node.on('mouseenter', () => {
         if (this.activeTool() === 'eraser') {
           this.setStageCursor(CURSORS.eraserHot);
@@ -1021,7 +1022,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
     const stepArrows = frames[to].arrows.length > 0 ? frames[to].arrows : frames[from].arrows;
     this.renderArrows(stepArrows);
     this.renderTexts(frames[to].texts ?? [], frames[to].note ?? '');
-    renderGoalScoredOverlay(this.drawingLayer, frames[to].entities, this.uprightRotation());
+    renderGoalScoredOverlay(this.drawingLayer, frames[to].entities, this.uprightRotation(), this.pitchView());
     this.drawingLayer.opacity(frames[to].arrows.length > 0 ? 0 : 1);
 
     const isPerspective = this.pitchView() === 'perspective';
@@ -1197,7 +1198,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
       () => {
         this.renderArrows(this.store.arrows(), false);
         this.renderTexts(this.store.texts(), this.store.note());
-        renderGoalScoredOverlay(this.drawingLayer, this.store.entities(), this.uprightRotation());
+        renderGoalScoredOverlay(this.drawingLayer, this.store.entities(), this.uprightRotation(), this.pitchView());
       },
       () => this.syncFromStore(),
       (msg) => this.showStatus(msg)
@@ -1240,7 +1241,7 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
           this.renderShapes(shapes);
           this.renderArrows(arrows, false);
           this.renderTexts(texts, note);
-          renderGoalScoredOverlay(this.drawingLayer, goalEntities, this.uprightRotation());
+          renderGoalScoredOverlay(this.drawingLayer, goalEntities, this.uprightRotation(), this.pitchView());
           this.drawingLayer.opacity(drawingOpacity);
         },
         onProgress: (pct) => this.exportProgress.set(pct),
@@ -1419,19 +1420,25 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
             y2: internalY,
             color: this.drawColor(),
           },
-          false
+          false,
+          this.pitchView() === 'perspective'
         );
         this.shapesLayer.add(this.currentShape);
         return;
       }
 
       this.freehandPoints = [Math.round(internalX), Math.round(internalY)];
+      let drawStart = [internalX, internalY];
+      if (this.pitchView() === 'perspective') {
+        const p = projectPitchPoint(internalX, internalY);
+        drawStart = [p.x, p.y];
+      }
       this.currentArrow = createArrowGroup({
-        points: [internalX, internalY, internalX, internalY],
+        points: [drawStart[0], drawStart[1], drawStart[0], drawStart[1]],
         style: this.arrowStyle(),
         color: this.drawColor(),
         strokeWidth: this.drawWidth(),
-        pathPoints: this.freehandPoints,
+        pathPoints: this.pitchView() === 'perspective' ? projectPointList(this.freehandPoints) : this.freehandPoints,
       });
 
       this.drawingLayer.add(this.currentArrow);
@@ -1457,7 +1464,8 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
             y2: internalY,
             color: this.drawColor(),
           },
-          false
+          false,
+          this.pitchView() === 'perspective'
         );
         this.shapesLayer.add(this.currentShape);
         this.shapesLayer.batchDraw();
@@ -1474,12 +1482,25 @@ export class PitchBoardComponent implements AfterViewInit, OnDestroy {
         }
       }
 
+      let p1 = [x1, y1];
+      let p2 = [internalX, internalY];
+      let fhPoints = this.freehandPoints;
+      if (this.pitchView() === 'perspective') {
+        const proj1 = projectPitchPoint(x1, y1);
+        const proj2 = projectPitchPoint(internalX, internalY);
+        p1 = [proj1.x, proj1.y];
+        p2 = [proj2.x, proj2.y];
+        if (this.freehandPoints.length >= 4) {
+          fhPoints = projectPointList(this.freehandPoints);
+        }
+      }
+
       updateArrowGroup(
         this.currentArrow,
-        [x1, y1, internalX, internalY],
+        [p1[0], p1[1], p2[0], p2[1]],
         this.arrowStyle(),
         undefined,
-        this.freehandPoints
+        fhPoints
       );
       this.drawingLayer.batchDraw();
     });

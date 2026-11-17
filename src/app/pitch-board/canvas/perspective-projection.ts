@@ -6,7 +6,7 @@
  * projection mapping pointer events back to pitch coordinates.
  */
 
-import { BASE_HEIGHT, BASE_WIDTH } from '../models/tactical-board.models';
+import { BASE_HEIGHT, BASE_WIDTH, GOAL_DEPTH } from '../models/tactical-board.models';
 
 export interface PerspectivePoint {
   x: number;
@@ -30,7 +30,7 @@ const Y_V =
 
 /**
  * Projects a 2D pitch coordinate (x in [0, 1050], y in [0, 680])
- * into the 3D perspective screen coordinates.
+ * into the 3D perspective screen coordinates. Allows goal net margins.
  *
  * Orientation:
  * - x = 0 (Home/Defending Goal) is at the near bottom.
@@ -39,8 +39,8 @@ const Y_V =
  * - y = 680 (Right Touchline) is on the right.
  */
 export function projectPitchPoint(pitchX: number, pitchY: number): PerspectivePoint {
-  const ty = Math.max(0, Math.min(1, pitchX / BASE_WIDTH));
-  const tx = Math.max(0, Math.min(1, pitchY / BASE_HEIGHT));
+  const ty = Math.max(-0.035, Math.min(1.035, pitchX / BASE_WIDTH));
+  const tx = Math.max(-0.04, Math.min(1.04, pitchY / BASE_HEIGHT));
 
   const s = 1 / (1 + K * ty);
   const screenY = Y_V + (PERSPECTIVE_CONFIG.yNear - Y_V) * s;
@@ -53,16 +53,23 @@ export function projectPitchPoint(pitchX: number, pitchY: number): PerspectivePo
 }
 
 /**
- * Maps screen coordinates from pointer/mouse back into 2D pitch coordinates (0..1050, 0..680).
+ * Maps screen coordinates from pointer/mouse back into 2D pitch coordinates (-GOAL_DEPTH..1050+GOAL_DEPTH, 0..680).
  */
-export function unprojectPitchPoint(screenX: number, screenY: number): { x: number; y: number } {
+export function unprojectPitchPoint(
+  screenX: number,
+  screenY: number,
+  allowGoalNet = true
+): { x: number; y: number } {
   const sRaw = (screenY - Y_V) / (PERSPECTIVE_CONFIG.yNear - Y_V);
-  const s = Math.max(PERSPECTIVE_CONFIG.sFar * 0.75, Math.min(1.2, sRaw));
+  const s = Math.max(PERSPECTIVE_CONFIG.sFar * 0.7, Math.min(1.25, sRaw));
 
   const ty = (1 / s - 1) / K;
   const tx = 0.5 + (screenX - PERSPECTIVE_CONFIG.xCenter) / (PERSPECTIVE_CONFIG.wNear * s);
 
-  const pitchX = Math.round(Math.max(0, Math.min(BASE_WIDTH, ty * BASE_WIDTH)));
+  const minX = allowGoalNet ? -GOAL_DEPTH : 0;
+  const maxX = allowGoalNet ? BASE_WIDTH + GOAL_DEPTH : BASE_WIDTH;
+
+  const pitchX = Math.round(Math.max(minX, Math.min(maxX, ty * BASE_WIDTH)));
   const pitchY = Math.round(Math.max(0, Math.min(BASE_HEIGHT, tx * BASE_HEIGHT)));
 
   return { x: pitchX, y: pitchY };

@@ -503,24 +503,64 @@ export { drawPitchDivisions } from './pitch-divisions';
 export function renderGoalScoredOverlay(
   drawingLayer: Konva.Layer,
   entities: TacticalEntity[],
-  uprightRot: number
+  uprightRot: number,
+  viewMode: PitchViewMode = 'full'
 ): void {
   const balls = entities.filter((e) => e.type === 'ball');
+  const isPerspective = viewMode === 'perspective';
+
   const checkGoal = (side: 'left' | 'right') => {
     const scored = balls.some((b) =>
       side === 'left'
-        ? b.x <= 12 && b.y >= GOAL_TOP - 4 && b.y <= GOAL_TOP + GOAL_WIDTH + 4
-        : b.x >= BASE_WIDTH - 12 && b.y >= GOAL_TOP - 4 && b.y <= GOAL_TOP + GOAL_WIDTH + 4
+        ? b.x <= 16 && b.y >= GOAL_TOP - 8 && b.y <= GOAL_TOP + GOAL_WIDTH + 8
+        : b.x >= BASE_WIDTH - 16 && b.y >= GOAL_TOP - 8 && b.y <= GOAL_TOP + GOAL_WIDTH + 8
     );
     if (!scored) return;
 
-    const gx = side === 'left' ? -GOAL_DEPTH : BASE_WIDTH;
+    let gx: number;
+    let gy: number;
+    let gw: number;
+    let gh: number;
+    let badgeX: number;
+    let badgeY: number;
+
+    if (isPerspective) {
+      if (side === 'left') {
+        // Near goal (bottom of screen)
+        const p1 = projectPitchPoint(0, GOAL_TOP);
+        const p2 = projectPitchPoint(0, GOAL_TOP + GOAL_WIDTH);
+        gx = p1.x;
+        gy = p1.y;
+        gw = p2.x - p1.x;
+        gh = 48;
+        badgeX = (p1.x + p2.x) / 2;
+        badgeY = p1.y - 20;
+      } else {
+        // Far goal (top of screen)
+        const p1 = projectPitchPoint(BASE_WIDTH, GOAL_TOP);
+        const p2 = projectPitchPoint(BASE_WIDTH, GOAL_TOP + GOAL_WIDTH);
+        gx = p1.x;
+        gy = p1.y - 26;
+        gw = p2.x - p1.x;
+        gh = 26;
+        badgeX = (p1.x + p2.x) / 2;
+        badgeY = p1.y + 22;
+      }
+    } else {
+      gx = side === 'left' ? -GOAL_DEPTH : BASE_WIDTH;
+      gy = GOAL_TOP;
+      gw = GOAL_DEPTH;
+      gh = GOAL_WIDTH;
+      badgeX = side === 'left' ? 38 : BASE_WIDTH - 38;
+      badgeY = GOAL_TOP - 18;
+    }
+
     drawingLayer.add(
       new Konva.Rect({
         x: gx,
-        y: GOAL_TOP,
-        width: GOAL_DEPTH,
-        height: GOAL_WIDTH,
+        y: gy,
+        width: gw,
+        height: gh,
         fill: 'rgba(250, 204, 21, 0.42)',
         stroke: '#facc15',
         strokeWidth: 3,
@@ -528,8 +568,6 @@ export function renderGoalScoredOverlay(
       })
     );
 
-    const badgeX = side === 'left' ? 38 : BASE_WIDTH - 38;
-    const badgeY = GOAL_TOP - 18;
     const badge = new Konva.Group({
       x: badgeX,
       y: badgeY,

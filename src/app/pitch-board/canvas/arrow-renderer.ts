@@ -5,6 +5,7 @@ import {
   TacticalShape,
   TacticalEntity,
 } from '../models/tactical-board.models';
+import { projectPitchPoint } from './perspective-projection';
 
 export const ZONE_RADIUS = 28;
 
@@ -111,12 +112,9 @@ export function computeTBarPoints(pathPoints: number[]): [number, number, number
 
 export function createShapeNode(
   s: Pick<TacticalShape, 'kind' | 'x1' | 'y1' | 'x2' | 'y2' | 'color'>,
-  listening: boolean
+  listening: boolean,
+  isPerspective = false
 ): Konva.Shape {
-  const x = Math.min(s.x1, s.x2);
-  const y = Math.min(s.y1, s.y2);
-  const w = Math.abs(s.x2 - s.x1);
-  const h = Math.abs(s.y2 - s.y1);
   const fill = hexWithAlpha(s.color, 0.2);
   const common = {
     fill,
@@ -125,6 +123,52 @@ export function createShapeNode(
     dash: [8, 5],
     listening,
   };
+
+  if (isPerspective) {
+    if (s.kind === 'triangle') {
+      const p1 = projectPitchPoint((s.x1 + s.x2) / 2, s.y1);
+      const p2 = projectPitchPoint(s.x2, s.y2);
+      const p3 = projectPitchPoint(s.x1, s.y2);
+      return new Konva.Line({
+        points: [p1.x, p1.y, p2.x, p2.y, p3.x, p3.y],
+        closed: true,
+        ...common,
+      });
+    }
+    if (s.kind === 'ellipse') {
+      const cx = (s.x1 + s.x2) / 2;
+      const cy = (s.y1 + s.y2) / 2;
+      const rx = Math.abs(s.x2 - s.x1) / 2;
+      const ry = Math.abs(s.y2 - s.y1) / 2;
+      const pts: number[] = [];
+      for (let a = 0; a <= 360; a += 15) {
+        const rad = (a * Math.PI) / 180;
+        const px = cx + Math.cos(rad) * rx;
+        const py = cy + Math.sin(rad) * ry;
+        const proj = projectPitchPoint(px, py);
+        pts.push(proj.x, proj.y);
+      }
+      return new Konva.Line({
+        points: pts,
+        closed: true,
+        ...common,
+      });
+    }
+    const p1 = projectPitchPoint(s.x1, s.y1);
+    const p2 = projectPitchPoint(s.x2, s.y1);
+    const p3 = projectPitchPoint(s.x2, s.y2);
+    const p4 = projectPitchPoint(s.x1, s.y2);
+    return new Konva.Line({
+      points: [p1.x, p1.y, p2.x, p2.y, p3.x, p3.y, p4.x, p4.y],
+      closed: true,
+      ...common,
+    });
+  }
+
+  const x = Math.min(s.x1, s.x2);
+  const y = Math.min(s.y1, s.y2);
+  const w = Math.abs(s.x2 - s.x1);
+  const h = Math.abs(s.y2 - s.y1);
 
   if (s.kind === 'ellipse') {
     return new Konva.Ellipse({

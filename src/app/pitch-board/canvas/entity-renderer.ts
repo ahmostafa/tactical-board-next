@@ -100,14 +100,19 @@ export function renderTextsOnLayer(
 
   const canDrag = cb.activeTool() === 'move' && !cb.isPlaying() && !cb.isExporting();
   const canErase = cb.activeTool() === 'eraser';
+  const isPerspective = cb.pitchView() === 'perspective';
+
   texts.forEach((t) => {
+    const pos = isPerspective ? projectPitchPoint(t.x, t.y) : { x: t.x, y: t.y, scale: 1 };
     const textGroup = new Konva.Group({
-      x: t.x,
-      y: t.y,
+      x: pos.x,
+      y: pos.y,
+      scaleX: pos.scale,
+      scaleY: pos.scale,
       rotation: uprightRot,
       draggable: canDrag,
       listening: canDrag || canErase,
-      dragBoundFunc: (pos) => cb.clampStageDragPos(pos, 15),
+      dragBoundFunc: (dragPos) => cb.clampStageDragPos(dragPos, 15),
     });
     const padX = 8;
     const padY = 4;
@@ -159,7 +164,12 @@ export function renderTextsOnLayer(
     textGroup.on('dragend', () => {
       cb.setStageCursor('grab');
       const p = textGroup.position();
-      cb.onUpdateTextPosition(t.id, Math.round(p.x), Math.round(p.y));
+      if (isPerspective) {
+        const unproj = unprojectPitchPoint(p.x, p.y);
+        cb.onUpdateTextPosition(t.id, unproj.x, unproj.y);
+      } else {
+        cb.onUpdateTextPosition(t.id, Math.round(p.x), Math.round(p.y));
+      }
     });
     drawingLayer.add(textGroup);
   });
@@ -216,7 +226,7 @@ export function syncEntityNodes(
         cb.setStageCursor('grab');
         const newPos = group!.position();
         if (cb.pitchView?.() === 'perspective') {
-          const unproj = unprojectPitchPoint(newPos.x, newPos.y);
+          const unproj = unprojectPitchPoint(newPos.x, newPos.y, isBall);
           cb.onUpdatePosition(entity.id, unproj.x, unproj.y);
         } else {
           cb.onUpdatePosition(entity.id, Math.round(newPos.x), Math.round(newPos.y));
